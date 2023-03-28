@@ -2793,6 +2793,8 @@ HRESULT CordbRefEnum::Next(ULONG celt, COR_GC_REFERENCE refs[], ULONG *pceltFetc
 
 HRESULT CordbRefEnum::DisableInteriorPointerDecoding(BOOL disableDecoding)
 {
+    PUBLIC_API_ENTRY(this);
+
     // Cannot set the flag after we've already started enumerating.
     if (mRefHandle)
         return E_FAIL;
