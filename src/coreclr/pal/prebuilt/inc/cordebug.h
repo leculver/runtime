@@ -303,6 +303,13 @@ typedef interface ICorDebugGCReferenceEnum ICorDebugGCReferenceEnum;
 #endif 	/* __ICorDebugGCReferenceEnum_FWD_DEFINED__ */
 
 
+#ifndef __ICorDebugGCReferenceEnum2_FWD_DEFINED__
+#define __ICorDebugGCReferenceEnum2_FWD_DEFINED__
+typedef interface ICorDebugGCReferenceEnum2 ICorDebugGCReferenceEnum2;
+
+#endif 	/* __ICorDebugGCReferenceEnum2_FWD_DEFINED__ */
+
+
 #ifndef __ICorDebugProcess_FWD_DEFINED__
 #define __ICorDebugProcess_FWD_DEFINED__
 typedef interface ICorDebugProcess ICorDebugProcess;
@@ -6419,6 +6426,7 @@ enum CorGCReferenceType
         CorHandleWeakWinRT	= CorHandleWeakNativeCom,
         CorReferenceStack	= 0x80000001,
         CorReferenceFinalizer	= 80000002,
+        CorReferenceStackInterior	= 0x80000003,
         CorHandleStrongOnly	= 0x1e3,
         CorHandleWeakOnly	= 0x21c,
         CorHandleAll	= 0x7fffffff
@@ -6550,6 +6558,123 @@ EXTERN_C const IID IID_ICorDebugGCReferenceEnum;
 
 
 #endif 	/* __ICorDebugGCReferenceEnum_INTERFACE_DEFINED__ */
+
+#ifndef __ICorDebugGCReferenceEnum2_INTERFACE_DEFINED__
+#define __ICorDebugGCReferenceEnum2_INTERFACE_DEFINED__
+
+/* interface ICorDebugGCReferenceEnum2 */
+/* [unique][uuid][local][object] */ 
+
+
+EXTERN_C const IID IID_ICorDebugGCReferenceEnum2;
+
+#if defined(__cplusplus) && !defined(CINTERFACE)
+    
+    MIDL_INTERFACE("7F3C24D3-7E1D-4245-AC3A-0D8308D0B14C")
+    ICorDebugGCReferenceEnum2 : public ICorDebugGCReferenceEnum
+    {
+    public:
+        virtual HRESULT STDMETHODCALLTYPE DisableInteriorPointerDecoding( 
+            BOOL disableDecoding) = 0;
+        
+    };
+    
+    
+#else 	/* C style interface */
+
+    typedef struct ICorDebugGCReferenceEnum2Vtbl
+    {
+        BEGIN_INTERFACE
+        
+        HRESULT ( STDMETHODCALLTYPE *QueryInterface )( 
+            ICorDebugGCReferenceEnum2 * This,
+            /* [in] */ REFIID riid,
+            /* [annotation][iid_is][out] */ 
+            _COM_Outptr_  void **ppvObject);
+        
+        ULONG ( STDMETHODCALLTYPE *AddRef )( 
+            ICorDebugGCReferenceEnum2 * This);
+        
+        ULONG ( STDMETHODCALLTYPE *Release )( 
+            ICorDebugGCReferenceEnum2 * This);
+        
+        HRESULT ( STDMETHODCALLTYPE *Skip )( 
+            ICorDebugGCReferenceEnum2 * This,
+            /* [in] */ ULONG celt);
+        
+        HRESULT ( STDMETHODCALLTYPE *Reset )( 
+            ICorDebugGCReferenceEnum2 * This);
+        
+        HRESULT ( STDMETHODCALLTYPE *Clone )( 
+            ICorDebugGCReferenceEnum2 * This,
+            /* [out] */ ICorDebugEnum **ppEnum);
+        
+        HRESULT ( STDMETHODCALLTYPE *GetCount )( 
+            ICorDebugGCReferenceEnum2 * This,
+            /* [out] */ ULONG *pcelt);
+        
+        HRESULT ( STDMETHODCALLTYPE *Next )( 
+            ICorDebugGCReferenceEnum2 * This,
+            /* [in] */ ULONG celt,
+            /* [length_is][size_is][out] */ COR_GC_REFERENCE roots[  ],
+            /* [out] */ ULONG *pceltFetched);
+        
+        HRESULT ( STDMETHODCALLTYPE *DisableInteriorPointerDecoding )( 
+            ICorDebugGCReferenceEnum2 * This,
+            BOOL disableDecoding);
+        
+        END_INTERFACE
+    } ICorDebugGCReferenceEnum2Vtbl;
+
+    interface ICorDebugGCReferenceEnum2
+    {
+        CONST_VTBL struct ICorDebugGCReferenceEnum2Vtbl *lpVtbl;
+    };
+
+    
+
+#ifdef COBJMACROS
+
+
+#define ICorDebugGCReferenceEnum2_QueryInterface(This,riid,ppvObject)	\
+    ( (This)->lpVtbl -> QueryInterface(This,riid,ppvObject) ) 
+
+#define ICorDebugGCReferenceEnum2_AddRef(This)	\
+    ( (This)->lpVtbl -> AddRef(This) ) 
+
+#define ICorDebugGCReferenceEnum2_Release(This)	\
+    ( (This)->lpVtbl -> Release(This) ) 
+
+
+#define ICorDebugGCReferenceEnum2_Skip(This,celt)	\
+    ( (This)->lpVtbl -> Skip(This,celt) ) 
+
+#define ICorDebugGCReferenceEnum2_Reset(This)	\
+    ( (This)->lpVtbl -> Reset(This) ) 
+
+#define ICorDebugGCReferenceEnum2_Clone(This,ppEnum)	\
+    ( (This)->lpVtbl -> Clone(This,ppEnum) ) 
+
+#define ICorDebugGCReferenceEnum2_GetCount(This,pcelt)	\
+    ( (This)->lpVtbl -> GetCount(This,pcelt) ) 
+
+
+#define ICorDebugGCReferenceEnum2_Next(This,celt,roots,pceltFetched)	\
+    ( (This)->lpVtbl -> Next(This,celt,roots,pceltFetched) ) 
+
+
+#define ICorDebugGCReferenceEnum2_DisableInteriorPointerDecoding(This,disableDecoding)	\
+    ( (This)->lpVtbl -> DisableInteriorPointerDecoding(This,disableDecoding) ) 
+
+#endif /* COBJMACROS */
+
+
+#endif 	/* C style interface */
+
+
+
+
+#endif 	/* __ICorDebugGCReferenceEnum2_INTERFACE_DEFINED__ */
 
 
 /* interface __MIDL_itf_cordebug_0000_0036 */

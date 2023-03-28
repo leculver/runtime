@@ -2475,7 +2475,7 @@ public:
     //  Exceptions:
     //      Does not throw, but does not catch exceptions either.
     virtual
-    HRESULT CreateRefWalk(OUT RefWalkHandle * pHandle, BOOL walkStacks, BOOL walkFQ, UINT32 handleWalkMask) = 0;
+    HRESULT CreateRefWalk(OUT RefWalkHandle * pHandle, BOOL walkStacks, BOOL disableStackDecoding, BOOL walkFQ, UINT32 handleWalkMask) = 0;
 
     // Deletes a reference walk.
     // Parameters:

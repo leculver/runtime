@@ -137,7 +137,7 @@ public:
 
 
 
-    HRESULT CreateRefWalk(RefWalkHandle * pHandle, BOOL walkStacks, BOOL walkFQ, UINT32 handleWalkMask);
+    HRESULT CreateRefWalk(RefWalkHandle * pHandle, BOOL walkStacks, BOOL disableStackDecoding, BOOL walkFQ, UINT32 handleWalkMask);
     void DeleteRefWalk(RefWalkHandle handle);
     HRESULT WalkRefs(RefWalkHandle handle, ULONG count, OUT DacGcReference * objects, OUT ULONG *pFetched);
 

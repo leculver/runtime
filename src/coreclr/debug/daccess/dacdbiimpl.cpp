@@ -7077,11 +7077,11 @@ bool DacDbiInterfaceImpl::GetAppDomainForObject(CORDB_ADDRESS addr, OUT VMPTR_Ap
     return true;
 }
 
-HRESULT DacDbiInterfaceImpl::CreateRefWalk(OUT RefWalkHandle * pHandle, BOOL walkStacks, BOOL walkFQ, UINT32 handleWalkMask)
+HRESULT DacDbiInterfaceImpl::CreateRefWalk(OUT RefWalkHandle * pHandle, BOOL walkStacks, BOOL disableStackDecoding, BOOL walkFQ, UINT32 handleWalkMask)
 {
     DD_ENTER_MAY_THROW;
 
-    DacRefWalker *walker = new (nothrow) DacRefWalker(this, walkStacks, walkFQ, handleWalkMask, TRUE);
+    DacRefWalker *walker = new (nothrow) DacRefWalker(this, walkStacks, walkFQ, handleWalkMask, !disableStackDecoding);
 
     if (walker == NULL)
         return E_OUTOFMEMORY;
@@ -7773,7 +7773,15 @@ HRESULT DacStackReferenceWalker::Next(ULONG count, DacGcReference stackRefs[], U
         const SOSStackRefData &sosStackRef = mList.Get(i);
         if (sosStackRef.Flags & GC_CALL_INTERIOR)
         {
-            stackRefs[i].pObject = CLRDATA_ADDRESS_TO_TADDR(sosStackRef.Object) | 1;
+            if (mResolvePointers)
+            {
+                stackRefs[i].pObject = CLRDATA_ADDRESS_TO_TADDR(sosStackRef.Object) | 1;
+            }
+            else
+            {
+                stackRefs[i].dwType = CorReferenceStackInterior;
+                stackRefs[i].objHnd.SetDacTargetPtr(CLRDATA_ADDRESS_TO_TADDR(sosStackRef.Address));
+            }
         }
         else
         {

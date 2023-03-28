@@ -11001,7 +11001,7 @@ private:
 };
 
 
-class CordbRefEnum : public CordbBase, public ICorDebugGCReferenceEnum
+class CordbRefEnum : public CordbBase, public ICorDebugGCReferenceEnum2
 {
 public:
     CordbRefEnum(CordbProcess *proc, BOOL walkWeakRefs);
@@ -11032,12 +11032,15 @@ public:
     COM_METHOD Next(ULONG celt,
                     COR_GC_REFERENCE refs[],
                     ULONG *pceltFetched);
+    
+    COM_METHOD DisableInteriorPointerDecoding(BOOL disableDecoding);
 
     virtual void Neuter();
 
 private:
     RefWalkHandle mRefHandle;
     BOOL mEnumStacksFQ;
+    BOOL mDisableDecoding;
     UINT32 mHandleMask;
 };
 

@@ -2604,13 +2604,13 @@ HRESULT CordbProcess::GetTypeForObject(CORDB_ADDRESS addr, CordbAppDomain* pAppD
 // ******************************************
 CordbRefEnum::CordbRefEnum(CordbProcess *proc, BOOL walkWeakRefs)
     : CordbBase(proc, 0, enumCordbHeap), mRefHandle(0), mEnumStacksFQ(TRUE),
-      mHandleMask((UINT32)(walkWeakRefs ? CorHandleAll : CorHandleStrongOnly))
+      mDisableDecoding(FALSE), mHandleMask((UINT32)(walkWeakRefs ? CorHandleAll : CorHandleStrongOnly))
 {
 }
 
 CordbRefEnum::CordbRefEnum(CordbProcess *proc, CorGCReferenceType types)
     : CordbBase(proc, 0, enumCordbHeap), mRefHandle(0), mEnumStacksFQ(FALSE),
-      mHandleMask((UINT32)types)
+      mDisableDecoding(FALSE), mHandleMask((UINT32)types)
 {
 }
 
@@ -2641,6 +2641,10 @@ HRESULT CordbRefEnum::QueryInterface(REFIID riid, void **ppInterface)
     if (riid == IID_ICorDebugGCReferenceEnum)
     {
         *ppInterface = static_cast<ICorDebugGCReferenceEnum*>(this);
+    }
+    else if (riid == IID_ICorDebugGCReferenceEnum2)
+    {
+        *ppInterface = static_cast<ICorDebugGCReferenceEnum2*>(this);
     }
     else if (riid == IID_IUnknown)
     {
@@ -2708,7 +2712,7 @@ HRESULT CordbRefEnum::Next(ULONG celt, COR_GC_REFERENCE refs[], ULONG *pceltFetc
     EX_TRY
     {
         if (!mRefHandle)
-            hr = process->GetDAC()->CreateRefWalk(&mRefHandle, mEnumStacksFQ, mEnumStacksFQ, mHandleMask);
+            hr = process->GetDAC()->CreateRefWalk(&mRefHandle, mEnumStacksFQ, mDisableDecoding, mEnumStacksFQ, mHandleMask);
 
         if (SUCCEEDED(hr))
         {
@@ -2785,6 +2789,17 @@ HRESULT CordbRefEnum::Next(ULONG celt, COR_GC_REFERENCE refs[], ULONG *pceltFetc
     EX_CATCH_HRESULT(hr);
 
     return hr;
+}
+
+HRESULT CordbRefEnum::DisableInteriorPointerDecoding(BOOL disableDecoding)
+{
+    // Cannot set the flag after we've already started enumerating.
+    if (mRefHandle)
+        return E_FAIL;
+
+    mDisableDecoding = TRUE;
+
+    return S_OK;
 }
 
 

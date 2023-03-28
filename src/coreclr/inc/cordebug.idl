@@ -2577,6 +2577,7 @@ typedef enum CorGCReferenceType
 
     CorReferenceStack = 0x80000001,
     CorReferenceFinalizer = 80000002,
+    CorReferenceStackInterior = 0x80000003,
 
     // Used for EnumHandles
     CorHandleStrongOnly = 0x1E3,
@@ -2614,6 +2615,17 @@ interface ICorDebugGCReferenceEnum : ICorDebugEnum
     HRESULT Next([in] ULONG celt,
                  [out, size_is(celt), length_is(*pceltFetched)] COR_GC_REFERENCE roots[],
                  [out] ULONG *pceltFetched);
+}
+
+[
+    object,
+    local,
+    uuid(7F3C24D3-7E1D-4245-AC3A-0D8308D0B14C),
+    pointer_default(unique)
+]
+interface ICorDebugGCReferenceEnum2 : ICorDebugGCReferenceEnum
+{
+    HRESULT DisableInteriorPointerDecoding(BOOL disableDecoding);
 }
 
 cpp_quote("#ifndef _DEF_COR_ARRAY_LAYOUT_")
