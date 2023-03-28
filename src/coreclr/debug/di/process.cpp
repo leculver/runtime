@@ -2797,7 +2797,7 @@ HRESULT CordbRefEnum::DisableInteriorPointerDecoding(BOOL disableDecoding)
     if (mRefHandle)
         return E_FAIL;
 
-    mDisableDecoding = TRUE;
+    mDisableDecoding = disableDecoding;
 
     return S_OK;
 }
