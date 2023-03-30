@@ -1435,7 +1435,7 @@ HRESULT CordbType::Init(BOOL fForceInit)
         _ASSERTE(m_pClass != NULL);
         EX_TRY
         {
-            m_pClass->Init(CordbClass::BasicInfo);
+            hr = m_pClass->Init(CordbClass::BasicInfo);
         }
         EX_CATCH_HRESULT(hr);
         IfFailRet(hr);
@@ -1446,7 +1446,7 @@ HRESULT CordbType::Init(BOOL fForceInit)
         {
             EX_TRY
             {
-                m_pClass->Init(CordbClass::FullInfo);
+                hr = m_pClass->Init(CordbClass::FullInfo);
             }
             EX_CATCH_HRESULT(hr);
             IfFailRet(hr);
@@ -2348,7 +2348,7 @@ HRESULT CordbType::GetTypeID(COR_TYPEID *pId)
                                                       &vmModule,
                                                       &vmDomainAssembly);
 
-                vmTypeHandle = GetProcess()->GetDAC()->GetTypeHandle(vmModule, mdToken);
+                vmTypeHandle = GetProcess()->GetDAC()->GetTypeHandle(vmModule, mdToken, TRUE);
             }
             break;
         case ELEMENT_TYPE_ARRAY:
@@ -2382,7 +2382,7 @@ HRESULT CordbType::GetTypeID(COR_TYPEID *pId)
                     IfFailThrow(hr);
 
                     VMPTR_Module vmModule = GetModule();
-                    vmTypeHandle = GetProcess()->GetDAC()->GetTypeHandle(vmModule, mdToken);
+                    vmTypeHandle = GetProcess()->GetDAC()->GetTypeHandle(vmModule, mdToken, TRUE);
                 }
             }
             break;

@@ -289,7 +289,8 @@ public:
 
     // Get type handle for a TypeDef token, if one exists. For generics this returns the open type.
     VMPTR_TypeHandle GetTypeHandle(VMPTR_Module vmModule,
-                                   mdTypeDef metadataToken);
+                                   mdTypeDef metadataToken,
+                                   BOOL throwOnError);
 
     // Get the approximate type handle for an instantiated type. This may be identical to the exact type handle,
     // but if we have code sharing for generics,it may differ in that it may have canonical type parameters.

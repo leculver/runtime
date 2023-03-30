@@ -5108,7 +5108,7 @@ public:
 
     // If you want to force the init to happen even if we think the class
     // is up to date, set fForceInit to TRUE
-    void Init(ClassLoadLevel desiredLoadLevel = FullInfo);
+    HRESULT Init(ClassLoadLevel desiredLoadLevel = FullInfo);
 
     // determine if any fields for a type are unallocated statics
     BOOL GotUnallocatedStatic(DacDbiArrayList<FieldData> * pFieldList);

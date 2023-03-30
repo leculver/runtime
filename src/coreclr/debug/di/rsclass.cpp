@@ -141,52 +141,54 @@ HRESULT CordbClass::GetStaticFieldValue(mdFieldDef fieldDef,
         }
 
         // Make sure we have enough info about the class.
-        Init();
-
-        // Uninstantiated generics (eg, Foo<T>) don't have static data. Must use instantiated (eg Foo<int>)
-        // But all CordbClass instances are uninstantiated. So this should fail for all generic types.
-        // Normally, debuggers should be using ICorDebugType instead.
-        // Though in the forward compat case, they'll hit this.
-        if (HasTypeParams())
+        hr = Init();
+        if (SUCCEEDED(hr))
         {
-            ThrowHR(CORDBG_E_STATIC_VAR_NOT_AVAILABLE);
-        }
-
-
-        // Lookup the field given its metadata token.
-        FieldData *pFieldData;
-
-        hr = GetFieldInfo(fieldDef, &pFieldData);
-
-        // This field was added by EnC, need to use EnC specific code path
-        if (hr == CORDBG_E_ENC_HANGING_FIELD)
-        {
-            // Static fields added with EnC hang off the EnCFieldDesc
-            hr = GetEnCHangingField(fieldDef,
-                &pFieldData,
-                NULL);
-
-            if (SUCCEEDED(hr))
+            // Uninstantiated generics (eg, Foo<T>) don't have static data. Must use instantiated (eg Foo<int>)
+            // But all CordbClass instances are uninstantiated. So this should fail for all generic types.
+            // Normally, debuggers should be using ICorDebugType instead.
+            // Though in the forward compat case, they'll hit this.
+            if (HasTypeParams())
             {
-                fEnCHangingField = TRUE;
+                ThrowHR(CORDBG_E_STATIC_VAR_NOT_AVAILABLE);
             }
-            // Note: the FieldOffset in pFieldData has been cooked to produce
-            // the correct address of the field in the syncBlock.
-            // @todo: extend Debugger_IPCEFieldData so we don't have to cook the offset here
-        }
 
-        IfFailThrow(hr);
 
-        {
-            Instantiation emptyInst;
+            // Lookup the field given its metadata token.
+            FieldData *pFieldData;
 
-            hr = CordbClass::GetStaticFieldValue2(GetModule(),
-                pFieldData,
-                fEnCHangingField,
-                &emptyInst,
-                pFrame,
-                ppValue);
-            // Let hr fall through
+            hr = GetFieldInfo(fieldDef, &pFieldData);
+
+            // This field was added by EnC, need to use EnC specific code path
+            if (hr == CORDBG_E_ENC_HANGING_FIELD)
+            {
+                // Static fields added with EnC hang off the EnCFieldDesc
+                hr = GetEnCHangingField(fieldDef,
+                    &pFieldData,
+                    NULL);
+
+                if (SUCCEEDED(hr))
+                {
+                    fEnCHangingField = TRUE;
+                }
+                // Note: the FieldOffset in pFieldData has been cooked to produce
+                // the correct address of the field in the syncBlock.
+                // @todo: extend Debugger_IPCEFieldData so we don't have to cook the offset here
+            }
+
+            IfFailThrow(hr);
+
+            {
+                Instantiation emptyInst;
+
+                hr = CordbClass::GetStaticFieldValue2(GetModule(),
+                    pFieldData,
+                    fEnCHangingField,
+                    &emptyInst,
+                    pFrame,
+                    ppValue);
+                // Let hr fall through
+            }
         }
     }
     EX_CATCH_HRESULT(hr);
@@ -655,7 +657,9 @@ bool CordbClass::IsValueClass()
 	if (!m_fIsValueClassKnown)
     {
         ATT_REQUIRE_STOPPED_MAY_FAIL_OR_THROW(GetProcess(), ThrowHR);
-        Init();
+        HRESULT hr = Init();
+        if (FAILED(hr))
+            ThrowHR(hr);
     }
     return m_fIsValueClass;
 }
@@ -741,7 +745,7 @@ HRESULT CordbClass::GetThisType(const Instantiation * pInst, CordbType ** ppResu
 // Note:
 //   Throws CORDBG_E_CLASS_NOT_LOADED on failure
 //-----------------------------------------------------------------------------
-void CordbClass::Init(ClassLoadLevel desiredLoadLevel)
+HRESULT CordbClass::Init(ClassLoadLevel desiredLoadLevel)
 {
     INTERNAL_SYNC_API_ENTRY(this->GetProcess());
 
@@ -771,7 +775,10 @@ void CordbClass::Init(ClassLoadLevel desiredLoadLevel)
         // basic info load level
         if(desiredLoadLevel >= BasicInfo)
         {
-            vmTypeHandle = pDac->GetTypeHandle(m_pModule->GetRuntimeModule(), GetToken());
+            vmTypeHandle = pDac->GetTypeHandle(m_pModule->GetRuntimeModule(), GetToken(), FALSE);
+            if (vmTypeHandle == VMPTR_TypeHandle::NullPtr())
+                return CORDBG_E_CLASS_NOT_LOADED;
+
             SetIsValueClass(pDac->IsValueType(vmTypeHandle));
             m_fHasTypeParams = !!pDac->HasTypeParams(vmTypeHandle);
             m_loadLevel = BasicInfo;
@@ -801,6 +808,8 @@ void CordbClass::Init(ClassLoadLevel desiredLoadLevel)
                 m_loadLevel = FullInfo;
         }
     }
+
+    return S_OK;
 } // CordbClass::Init
 
 // determine if any fields for a type are unallocated statics
@@ -1109,7 +1118,10 @@ HRESULT CordbClass::GetFieldInfo(mdFieldDef fldToken, FieldData **ppFieldData)
 {
     INTERNAL_SYNC_API_ENTRY(GetProcess());
 
-    Init();
+    HRESULT hr = Init();
+    if (FAILED(hr))
+        return hr;
+
     return SearchFieldInfo(GetModule(), &m_classInfo.m_fieldList, m_token, fldToken, ppFieldData);
 }
 

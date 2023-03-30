@@ -1855,7 +1855,8 @@ public:
     //
     virtual
     VMPTR_TypeHandle GetTypeHandle(VMPTR_Module vmModule,
-                                   mdTypeDef metadataToken) = 0;
+                                   mdTypeDef metadataToken,
+                                   BOOL throwOnError) = 0;
 
     // Get the approximate type handle for an instantiated type. This may be identical to the exact type handle,
     // but if we have code sharing for generics, it may differ in that it may have canonical type parameters.

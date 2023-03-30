@@ -2721,7 +2721,8 @@ void DacDbiInterfaceImpl::TypeHandleToExpandedTypeInfoImpl(AreValueTypesBoxed   
 
 // Get type handle for a TypeDef token, if one exists. For generics this returns the open type.
 VMPTR_TypeHandle DacDbiInterfaceImpl::GetTypeHandle(VMPTR_Module vmModule,
-                                                    mdTypeDef metadataToken)
+                                                    mdTypeDef metadataToken,
+                                                    BOOL throwOnError)
 {
     DD_ENTER_MAY_THROW;
     Module* pModule = vmModule.GetDacPtr();
@@ -2731,6 +2732,9 @@ VMPTR_TypeHandle DacDbiInterfaceImpl::GetTypeHandle(VMPTR_Module vmModule,
     if (th.IsNull())
     {
         LOG((LF_CORDB, LL_INFO10000, "D::GTH: class isn't loaded.\n"));
+        if (!throwOnError)
+            return vmTypeHandle;
+
         ThrowHR(CORDBG_E_CLASS_NOT_LOADED);
     }
 
