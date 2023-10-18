@@ -649,7 +649,8 @@ void GCToOSInterface::FlushProcessWriteBuffers()
 // Break into a debugger
 void GCToOSInterface::DebugBreak()
 {
-    ::DebugBreak();
+    if (::IsDebuggerPresent())
+        ::DebugBreak();
 }
 
 // Causes the calling thread to sleep for the specified number of milliseconds

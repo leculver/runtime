@@ -4211,13 +4211,28 @@ bool GenerateDump(
 // Create crash dump if enabled and terminate process. Generates crash dumps for both
 // Windows and Linux if enabled. For Linux, it happens in TerminateProcess in the PAL.
 //************************************************************************************
-
 void CrashDumpAndTerminateProcess(UINT exitCode)
+{
+    // This must be done in a separate 
+    EXCEPTION_RECORD ex = {0};
+    ex.ExceptionCode = exitCode;
+    ex.ExceptionFlags = EXCEPTION_NONCONTINUABLE;
+    
+    RaiseFailFastException(&ex, nullptr, 0);
+}
+
+void CrashDumpAndTerminateProcess(UINT exitCode, EXCEPTION_RECORD* pExceptionRecord, CONTEXT *pContext)
 {
 #ifdef HOST_WINDOWS
     CreateCrashDumpIfEnabled(exitCode == COR_E_STACKOVERFLOW);
 #endif
-    TerminateProcess(GetCurrentProcess(), exitCode);
+
+    // If we are in a stack overflow state, don't create an EXCEPTION_RECORD on the stack,
+    // even those bytes might set us over the cliff.
+    if (pExceptionRecord != nullptr || exitCode == COR_E_STACKOVERFLOW)
+        RaiseFailFastException(pExceptionRecord, pContext, 0);
+
+    CrashDumpAndTerminateProcess(exitCode);
 }
 
 //---------------------------------------------------------------------------------------

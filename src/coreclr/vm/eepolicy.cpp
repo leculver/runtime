@@ -26,7 +26,7 @@
 #include "eventtrace.h"
 #undef ExitProcess
 
-void SafeExitProcess(UINT exitCode, ShutdownCompleteAction sca = SCA_ExitProcessWhenShutdownComplete)
+void SafeExitProcess(UINT exitCode, ShutdownCompleteAction sca = SCA_ExitProcessWhenShutdownComplete, EXCEPTION_POINTERS *pExceptionPointers = nullptr)
 {
     STRESS_LOG2(LF_SYNC, LL_INFO10, "SafeExitProcess: exitCode = %d sca = %d\n", exitCode, sca);
     CONTRACTL
@@ -71,7 +71,10 @@ void SafeExitProcess(UINT exitCode, ShutdownCompleteAction sca = SCA_ExitProcess
         // disabled because if we fault in this code path we will trigger our Watson code
         CONTRACT_VIOLATION(ThrowsViolation);
 
-        CrashDumpAndTerminateProcess(exitCode);
+        if (pExceptionPointers != nullptr)
+            CrashDumpAndTerminateProcess(exitCode, pExceptionPointers->ExceptionRecord, pExceptionPointers->ContextRecord);
+        else
+            CrashDumpAndTerminateProcess(exitCode);
     }
     else if (sca == SCA_ExitProcessWhenShutdownComplete)
     {
@@ -593,6 +596,9 @@ DWORD LogStackOverflowStackTraceThread(void* arg)
     return 0;
 }
 
+// This is needed to ensure that we don't use more stack space when hitting a stack overflow.
+static EXCEPTION_RECORD STACK_OVERFLOW_EXCEPTION_RECORD = {0};
+
 void DECLSPEC_NORETURN EEPolicy::HandleFatalStackOverflow(EXCEPTION_POINTERS *pExceptionInfo, BOOL fSkipDebugger)
 {
     // This is fatal error.  We do not care about SO mode any more.
@@ -732,7 +738,9 @@ void DECLSPEC_NORETURN EEPolicy::HandleFatalStackOverflow(EXCEPTION_POINTERS *pE
             (fTreatAsNativeUnhandledException == FALSE)? TypeOfReportedError::UnhandledException: TypeOfReportedError::NativeThreadUnhandledException);
     }
 
-    CrashDumpAndTerminateProcess(COR_E_STACKOVERFLOW);
+    STACK_OVERFLOW_EXCEPTION_RECORD.ExceptionCode = COR_E_STACKOVERFLOW;
+    STACK_OVERFLOW_EXCEPTION_RECORD.ExceptionFlags = EXCEPTION_NONCONTINUABLE;
+    CrashDumpAndTerminateProcess(COR_E_STACKOVERFLOW, &STACK_OVERFLOW_EXCEPTION_RECORD);
     UNREACHABLE();
 }
 
@@ -816,7 +824,7 @@ int NOINLINE EEPolicy::HandleFatalError(UINT exitCode, UINT_PTR address, LPCWSTR
 
         STRESS_LOG0(LF_CORDB,LL_INFO100, "D::HFE: About to call LogFatalError\n");
         LogFatalError(exitCode, address, pszMessage, pExceptionInfo, errorSource, argExceptionString);
-        SafeExitProcess(exitCode, SCA_TerminateProcessWhenShutdownComplete);
+        SafeExitProcess(exitCode, SCA_TerminateProcessWhenShutdownComplete, pExceptionInfo);
     }
 
     UNREACHABLE();
