@@ -308,7 +308,7 @@ VOID DECLSPEC_NORETURN DispatchManagedException(PAL_SEHException& ex, bool isHar
                 LONG disposition = InternalUnhandledExceptionFilter_Worker(&ex.ExceptionPointers);  \
                 _ASSERTE(disposition == EXCEPTION_CONTINUE_SEARCH);                                 \
             }                                                                                       \
-            CrashDumpAndTerminateProcess(1);                                                        \
+            CrashDumpAndTerminateProcess(COR_E_EXECUTIONENGINE);                                    \
             UNREACHABLE();                                                                          \
         }
 

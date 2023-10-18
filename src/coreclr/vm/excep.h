@@ -209,6 +209,7 @@ bool GenerateDump(LPCWSTR dumpName, INT dumpType, ULONG32 flags, LPSTR errorMess
 
 // Generates crash dumps if enabled for both Windows and Linux
 void CrashDumpAndTerminateProcess(UINT exitCode);
+void CrashDumpAndTerminateProcess(UINT exitCode, EXCEPTION_RECORD* pExceptionRecord, CONTEXT *pContextRecord = NULL);
 
 struct ThreadBaseExceptionFilterParam
 {

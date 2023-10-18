@@ -4815,7 +4815,7 @@ VOID DECLSPEC_NORETURN UnwindManagedExceptionPass1(PAL_SEHException& ex, CONTEXT
                     LONG disposition = InternalUnhandledExceptionFilter_Worker(&ex.ExceptionPointers);
                     _ASSERTE(disposition == EXCEPTION_CONTINUE_SEARCH);
                 }
-                CrashDumpAndTerminateProcess(1);
+                CrashDumpAndTerminateProcess(COR_E_EXECUTIONENGINE);
             }
             else
             {
@@ -4874,7 +4874,7 @@ VOID DECLSPEC_NORETURN UnwindManagedExceptionPass1(PAL_SEHException& ex, CONTEXT
                     LONG disposition = InternalUnhandledExceptionFilter_Worker(&ex.ExceptionPointers);
                     _ASSERTE(disposition == EXCEPTION_CONTINUE_SEARCH);
                 }
-                CrashDumpAndTerminateProcess(1);
+                CrashDumpAndTerminateProcess(COR_E_EXECUTIONENGINE);
                 UNREACHABLE();
             }
 

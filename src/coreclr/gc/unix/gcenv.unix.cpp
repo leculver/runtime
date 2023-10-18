@@ -472,6 +472,7 @@ void GCToOSInterface::FlushProcessWriteBuffers()
 // otherwise raises a SIGTRAP.
 void GCToOSInterface::DebugBreak()
 {
+    // Uh oh, what do we do here?
 #if __has_builtin(__builtin_debugtrap)
     __builtin_debugtrap();
 #else
