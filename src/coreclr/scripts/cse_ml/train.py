@@ -4,7 +4,7 @@
 import os
 import argparse
 
-from jitml import SuperPmiContext, JitCseModel, OptimalCseWrapper, NormalizeFeaturesWrapper, split_for_cse
+from jitml import SuperPmiCache, JitCseModel, OptimalCseWrapper, NormalizeFeaturesWrapper
 
 def validate_core_root(core_root):
     """Validates and returns the core_root directory."""
@@ -13,6 +13,14 @@ def validate_core_root(core_root):
         raise ValueError("--core_root must be specified or set as the environment variable CORE_ROOT.")
 
     return core_root
+
+def get_test_train_methods(mch : str, core_root : str) -> tuple[list[int], list[int]]:
+    """Gets the test and training methods if they do not already exist.  This will create a full SuperPmi cache if
+    it does not already exist."""
+    if not SuperPmiCache.exists(mch):
+        print(f"Caching SuperPmi methods for {mch}, this may take several minutes...")
+
+    return SuperPmiCache.get_test_train_methods(mch, core_root)
 
 def parse_args():
     """usage:  train.py [-h] [--core_root CORE_ROOT] [--parallel n] [--iterations i] model_path mch"""
@@ -38,19 +46,9 @@ def main(args):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
 
-    # Load or create the superpmi context.
-    spmi_file = args.mch + ".json"
-    if os.path.exists(spmi_file):
-        ctx = SuperPmiContext.load(spmi_file)
-    else:
-        print(f"Creating SuperPmiContext '{spmi_file}', this may take several minutes...")
-        ctx = SuperPmiContext.create_from_mch(args.mch, args.core_root)
-        ctx.save(spmi_file)
-
-    test_methods, training_methods = split_for_cse(ctx.methods, 0.1)
+    # Load or create cached SuperPmi data.
+    test_methods, training_methods = get_test_train_methods(args.mch, args.core_root)
     print(f"Training with {len(training_methods)} methods, holding back {len(test_methods)} for testing.")
-
-    # Define our own environment (with wrappers) if requested.
 
     # Train the model.
     rl = JitCseModel(args.algorithm)
@@ -63,7 +61,9 @@ def main(args):
         wrappers.append(NormalizeFeaturesWrapper)
 
     iterations = args.iterations if args.iterations is not None else 1_000_000
-    path = rl.train(ctx, training_methods, output_dir, iterations=iterations, parallel=args.parallel, wrappers=wrappers)
+    path = rl.train(args.mch, args.core_root, training_methods, output_dir, iterations=iterations,
+                    parallel=args.parallel, wrappers=wrappers)
+
     print(f"Model saved to: {path}")
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ import numpy as np
 import pandas
 import tqdm
 
-from jitml import SuperPmi, SuperPmiContext, JitCseModel, MethodContext, JitCseEnv, split_for_cse
+from jitml import SuperPmi, SuperPmiCache, JitCseModel, MethodContext, JitCseEnv
 from train import validate_core_root
 
 class ModelResult(Enum):
@@ -191,20 +191,17 @@ def main(args):
     if not os.path.exists(dir_or_path):
         raise FileNotFoundError(f"Path {dir_or_path} does not exist.")
 
-    # Load data.
-    spmi_file = args.mch + ".json"
-    if os.path.exists(spmi_file):
-        spmi_context = SuperPmiContext.load(spmi_file)
-    else:
-        print(f"Creating SuperPmiContext '{spmi_file}', this may take several minutes...")
-        spmi_context = SuperPmiContext.create_from_mch(args.mch, args.core_root)
-        spmi_context.save(spmi_file)
+    # Load or create cached SuperPmi data.
 
-    test_methods, training_methods = split_for_cse(spmi_context.methods, 0.1)
 
     for file in enumerate_models(dir_or_path):
         print(file)
-        with spmi_context.create_superpmi() as superpmi:
+        with SuperPmi(args.mch, args.core_root) as superpmi:
+            if not SuperPmiCache.exists:
+                print(f"Caching SuperPmi methods for {args.mch}, this may take several minutes...")
+
+            cache = SuperPmiCache(superpmi)
+
             # load the underlying model
             jitrl = JitCseModel(args.algorithm)
             jitrl.load(os.path.join(dir_or_path, file))
@@ -214,11 +211,11 @@ def main(args):
             model_name = os.path.splitext(file)[0]
 
             filename = os.path.join(dir_or_path, f"{model_name}_test.csv")
-            result = evaluate(superpmi, jitrl, test_methods, model_name, filename)
+            result = evaluate(superpmi, jitrl, cache.test_methods, model_name, filename)
             print_result(result, model_name, "Test")
 
             filename = os.path.join(dir_or_path, f"{model_name}_train.csv")
-            result = evaluate(superpmi, jitrl, training_methods, model_name, filename)
+            result = evaluate(superpmi, jitrl, cache.train_methods, model_name, filename)
             print_result(result, model_name, "Train")
 
 if __name__ == "__main__":

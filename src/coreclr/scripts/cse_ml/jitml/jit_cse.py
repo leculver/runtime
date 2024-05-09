@@ -5,7 +5,7 @@ import gymnasium as gym
 import numpy as np
 
 from .method_context import JitType, MethodContext
-from .superpmi import SuperPmi, SuperPmiContext
+from .superpmi import MethodKind, SuperPmi, SuperPmiCache, SuperPmiContext
 from .constants import (INVALID_ACTION_PENALTY, INVALID_ACTION_LIMIT, MAX_CSE, is_acceptable_for_cse)
 
 # observation space
@@ -35,6 +35,7 @@ class JitCseEnv(gym.Env):
             raise ValueError("No methods to train on.")
 
         self.__superpmi : SuperPmi = None
+        self.__cache : SuperPmiCache = None
         self.action_space = gym.spaces.Discrete(MAX_CSE + 1)
         self.observation_space = gym.spaces.Box(np.zeros((MAX_CSE, FEATURES)),
                                                 np.ones((MAX_CSE, FEATURES)),
@@ -56,11 +57,13 @@ class JitCseEnv(gym.Env):
         super().reset(seed=seed, options=options)
         self.last_info = None
 
+        superpmi = self.__get_or_create_superpmi()
+
         failure_count = 0
         while True:
             index = self.__select_method()
-            no_cse = self._jit_method_with_cleanup(index, JitMetrics=1, JitRLHook=1, JitRLHookCSEDecisions=[])
-            original_heuristic = self._jit_method_with_cleanup(index, JitMetrics=1)
+            no_cse = self.__cache.jit_method(superpmi, index, MethodKind.NO_CSE)
+            original_heuristic = self.__cache.jit_method(superpmi, index, MethodKind.HEURISTIC)
             if no_cse and original_heuristic:
                 break
 
@@ -235,6 +238,7 @@ class JitCseEnv(gym.Env):
     def __get_or_create_superpmi(self):
         if self.__superpmi is None:
             self.__superpmi = self.pmi_context.create_superpmi()
+            self.__cache = self.pmi_context.create_cache()
             self.__superpmi.start()
 
         return self.__superpmi

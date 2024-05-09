@@ -85,6 +85,13 @@ class MethodContext(BaseModel):
             raise ValueError("perf_score must not be negative")
         return v
 
+class CSEDecision(BaseModel):
+    """A common format for storing the outcome of choosing a specific CSE decision."""
+    method : MethodContext
+    heuristic_perfscore : float
+    no_cse_perfscore : float
+    cse_perfscore : List[float | None]
+
 __all__ = [
     CseCandidate.__name__,
     MethodContext.__name__,

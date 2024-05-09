@@ -1,22 +1,29 @@
 """Functions for interacting with SuperPmi."""
 
+from concurrent.futures import ThreadPoolExecutor
+from enum import Enum
 import json
 import os
 import subprocess
 import re
-from typing import Iterable, List, Optional
+from typing import Dict, Iterable, List
 from pydantic import BaseModel, field_validator
+import tqdm
 
+from .constants import split_for_cse
 from .method_context import MethodContext
 
+# We cannot pass a SuperPmi class across process boundaries.  So we need to create a context object that can be
+# serialized and deserialized.
 class SuperPmiContext(BaseModel):
     """Information about how to construct a SuperPmi object.  This tells us where to find CLR's CORE_ROOT with
     the superpmi and jit, and which .mch file to use.  Additionally, it tells us which methods to use for training
     and testing."""
     core_root : str
     mch : str
-    jit : Optional[str] = None
-    methods : Optional[List[MethodContext]] = []
+
+    def __repr__(self):
+        return f"SuperPmiContext(core_root={self.core_root}, mch={self.mch})"
 
     @field_validator('core_root', 'mch', mode='before')
     @classmethod
@@ -26,63 +33,34 @@ class SuperPmiContext(BaseModel):
 
         return v
 
-    @field_validator('jit', mode='before')
-    @classmethod
-    def _validate_optional_path(cls, v):
-        if v is not None and not os.path.exists(v):
-            raise FileNotFoundError(f"{v} does not exist.")
+    def create_superpmi(self) -> 'SuperPmi':
+        """Creates a SuperPmi object."""
+        return SuperPmi(self.mch, self.core_root)
 
-        return v
-
-    @staticmethod
-    def create_from_mch(mch : str, core_root : str,  jit : Optional[str] = None) -> 'SuperPmiContext':
-        """Loads the SuperPmiContext from the specified arguments."""
-        result = SuperPmiContext(core_root=core_root, mch=mch, jit=jit)
-
-        methods = []
-        with SuperPmi(result) as superpmi:
-            for method in superpmi.enumerate_methods():
-                methods.append(method)
-
-        result.methods = methods
-        return result
-
-    def save(self, file_path:str):
-        """Saves the SuperPmiContext to a file."""
-        with open(file_path, 'w', encoding="utf8") as f:
-            json.dump(self.model_dump(), f)
-
-    @staticmethod
-    def load(file_path:str):
-        """Loads the SuperPmiContext from a file."""
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"{file_path} does not exist.")
-
-        with open(file_path, 'r', encoding="utf8") as f:
-            data = json.load(f)
-            return SuperPmiContext(**data)
-
-    def create_superpmi(self, verbosity:str = 'q'):
-        """Creates a SuperPmi object from this context."""
-        return SuperPmi(self, verbosity)
+    def create_cache(self) -> 'SuperPmiCache':
+        """Creates a SuperPmiCache object."""
+        return SuperPmiCache(self.mch, self.core_root)
 
 class SuperPmi:
     """Controls one instance of superpmi."""
-    def __init__(self, context : SuperPmiContext, verbosity:str = 'q'):
+    def __init__(self, mch : str, core_root : str):
         """Constructor.
         core_root is the path to the coreclr build, usually at [repo]/artifiacts/bin/coreclr/[arch]/.
         verbosity is the verbosity level of the superpmi process. Default is 'q'."""
         self._process = None
         self._feature_names = None
-        self.context = context
-        self.verbose = verbosity
+        self.mch = mch
+        self.core_root = core_root
 
         if os.name == 'nt':
-            self.superpmi_path = os.path.join(context.core_root, 'superpmi.exe')
-            self.jit_path = os.path.join(context.core_root, context.jit if context.jit else 'clrjit.dll')
+            self.superpmi_path = os.path.join(core_root, 'superpmi.exe')
+            self.jit_path = os.path.join(core_root, 'clrjit.dll')
         else:
-            self.superpmi_path = os.path.join(context.core_root, 'superpmi')
-            self.jit_path = os.path.join(context.core_root, context.jit if context.jit else 'libclrjit.so')
+            self.superpmi_path = os.path.join(core_root, 'superpmi')
+            self.jit_path = os.path.join(core_root, 'libclrjit.so')
+
+        if not os.path.exists(self.mch):
+            raise FileNotFoundError(f"mch {self.mch} does not exist.")
 
         if not os.path.exists(self.superpmi_path):
             raise FileNotFoundError(f"superpmi {self.superpmi_path} does not exist.")
@@ -131,7 +109,7 @@ class SuperPmi:
             options['JitRLHookEmitFeatureNames'] = 1
 
         torun = f"{method_or_id}!"
-        torun += "!".join([f"{key}={value}" for key, value in options.items()])
+        torun += "!".join(self.__translate_options(options))
 
         if not process.poll():
             self.stop()
@@ -150,10 +128,21 @@ class SuperPmi:
 
         return result
 
-    def enumerate_methods(self) -> Iterable[MethodContext]:
+    def __translate_options(self, options:Dict[str,object]) -> List[str]:
+        return [f"{key}={value}" for key, value in options.items()]
+
+    def enumerate_methods(self, **options) -> Iterable[MethodContext]:
         """List all methods in the mch file."""
-        params = [self.superpmi_path, self.jit_path, self.context.mch, '-v', 'q', '-jitoption', 'JitMetrics=1',
-                  '-jitoption', 'JitRLHook=1', '-jitoption', 'JitRLHookEmitFeatureNames=1']
+
+        if "JitMetrics" not in options:
+            options["JitMetrics"] = 1
+
+        if "JitRLHook" in options and self._feature_names is None:
+            options['JitRLHookEmitFeatureNames'] = 1
+
+        params = [self.superpmi_path, self.jit_path, self.mch, '-v', 'q']
+        for option in self.__translate_options(options):
+            params.extend(['-jitoption', option])
 
         try:
             # pylint: disable=consider-using-with
@@ -221,11 +210,8 @@ class SuperPmi:
     def start(self):
         """Starts and returns the superpmi process."""
         if self._process is None:
-            params = [self.superpmi_path, self.jit_path, '-streaming', 'stdin', self.context.mch]
-            if self.verbose is not None:
-                params.extend(['-v', self.verbose])
-
             # pylint: disable=consider-using-with
+            params = [self.superpmi_path, self.jit_path, '-streaming', 'stdin', self.mch, '-v', 'q']
             self._process = subprocess.Popen(params, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
         return self._process
@@ -237,7 +223,197 @@ class SuperPmi:
             self._process.terminate()
             self._process = None
 
+class MethodKind(Enum):
+    """The kind of method."""
+    UNKNOWN = 0
+    NO_CSE = 1
+    HEURISTIC = 2
+
+class SuperPmiCache:
+    """A wrapper around superpmi that caches results to file."""
+    def __init__(self, mch : str, core_root : str):
+        self.mch = mch
+        self.core_root = core_root
+
+        with ThreadPoolExecutor() as executor:
+            future_no_cse = executor.submit(self._load_all_methods, MethodKind.NO_CSE)
+            future_heuristic = executor.submit(self._load_all_methods, MethodKind.HEURISTIC)
+
+            self.no_cse = future_no_cse.result()
+            self.heuristic = future_heuristic.result()
+
+        self.test_methods, self.train_methods = self._get_test_train()
+
+    def _get_test_train(self):
+        split_file = SuperPmiCache._get_split_file(self.mch)
+        if os.path.exists(split_file):
+            try:
+                with open(split_file, 'r', encoding="utf8") as f:
+                    return json.load(f)
+            except json.JSONDecodeError:
+                os.remove(split_file)
+
+        test, train = split_for_cse(self.no_cse.values(), test_percent=0.1)
+        test = [x.index for x in test]
+        train = [x.index for x in train]
+        with open(split_file, 'w', encoding="utf8") as f:
+            json.dump([test, train], f)
+
+        return test, train
+
+    @staticmethod
+    def _get_split_file(mch):
+        return f"{mch}.test_train.json"
+
+    @staticmethod
+    def _get_cache_file(mch, kind):
+        return f"{mch}.{kind.name.lower()}.json"
+
+    @staticmethod
+    def _get_single_cse_file(mch):
+        return f"{mch}.single_cse.json"
+
+    def __repr__(self):
+        # We don't want to print out the entire cache.
+        return f"SpmiMethodCache(no_cse={len(self.no_cse)}, heuristic={len(self.heuristic)})"
+
+    @staticmethod
+    def exists(mch : str) -> bool:
+        """Returns True if the cache file exists."""
+        return os.path.exists(SuperPmiCache._get_cache_file(mch, MethodKind.NO_CSE)) and \
+                os.path.exists(SuperPmiCache._get_cache_file(mch, MethodKind.HEURISTIC)) and \
+                os.path.exists(SuperPmiCache._get_split_file(mch))
+
+    @staticmethod
+    def get_test_train_methods(mch : str, core_root : str) -> List[int]:
+        """Loads the test methods from file."""
+        split_file = SuperPmiCache._get_split_file(mch)
+        if os.path.exists(split_file):
+            with open(split_file, 'r', encoding="utf8") as f:
+                return json.load(f)
+
+        # The constructor caches the result
+        cache = SuperPmiCache(mch, core_root)
+        return cache.test_methods, cache.train_methods
+
+    def jit_method(self, spmi : SuperPmi, method_index : int, kind_or_cses : MethodKind | List[int]) -> MethodContext:
+        """Gets the perf score for the specified kind of method."""
+        if isinstance(kind_or_cses, list) and len(kind_or_cses) == 0:
+            kind_or_cses = MethodKind.NO_CSE
+
+        if isinstance(kind_or_cses, MethodKind):
+            method = self._get_cache(kind_or_cses).get(method_index, None)
+            if method:
+                return method
+
+        match kind_or_cses:
+            case MethodKind.NO_CSE:
+                result = spmi.jit_method(method_index, JitMetrics=1, JitRLHook=1, JitRLHookCSEDecisions=[])
+                self.no_cse[method_index] = result
+                return result
+
+            case MethodKind.HEURISTIC:
+                result = spmi.jit_method(method_index, JitMetrics=1)
+                self.heuristic[method_index] = result
+                return result
+
+            case list() as indices:
+                return spmi.jit_method(method_index, JitMetrics=1, JitRLHook=1, JitRLHookCSEDecisions=indices)
+
+            case _:
+                raise ValueError("kind must be a known kind.")
+
+    def get_single_cse_decisions(self, spmi : SuperPmi, progress_bar : bool = True) -> Dict[int, List[float]]:
+        """Gets the perf scores for all single CSE decisions."""
+        filename = SuperPmiCache._get_single_cse_file(self.mch)
+
+        if os.path.exists(filename):
+            with open(filename, 'r', encoding="utf8") as f:
+                return json.load(f)
+
+        result = {}
+        if progress_bar:
+            print("Caching single CSE decisions, this will take a while...")
+
+        has_cses = [x for x in self.no_cse.values()
+                    if x.cse_candidates and any(x for x in x.cse_candidates if x.can_apply)]
+
+        has_cses = tqdm.tqdm(has_cses) if progress_bar else has_cses
+        for method in has_cses:
+            for cse in method.cse_candidates:
+                scores = [None] * len(method.cse_candidates)
+                if cse.can_apply:
+                    single = spmi.jit_method(method.index, JitMetrics=1, JitRLHook=1,
+                                             JitRLHookCSEDecisions=[cse.index])
+                    if single:
+                        scores[cse.index] = single.perf_score
+
+                if any(scores):
+                    result[method.index] = scores
+
+        with open(filename, 'w', encoding="utf8") as f:
+            json.dump(result, f)
+
+        return result
+
+    def _load_all_methods(self, kind : MethodKind) -> Dict[int, MethodContext]:
+        """Loads the cache from file."""
+        if kind == MethodKind.UNKNOWN:
+            raise ValueError("kind must be a known kind.")
+
+        filename = SuperPmiCache._get_cache_file(self.mch, kind)
+        if os.path.exists(filename):
+            # pylint: disable=broad-exception-caught
+
+            try:
+                result = {}
+                with open(filename, 'r', encoding="utf8") as f:
+                    data = json.load(f)
+
+                    for d in data:
+                        method = MethodContext(**d)
+                        result[method.index] = method
+
+                    return result
+
+            except Exception as e:
+                del result
+                print(f"Error loading {filename}: {e}")
+                print(f"Deleting {filename} and re-creating cache.")
+                os.remove(filename)
+
+        jit_flags = {}
+        jit_flags['JitMetrics'] = 1
+        match kind:
+            case MethodKind.NO_CSE:
+                jit_flags['JitRLHook'] = 1
+                jit_flags['JitRLHookCSEDecisions'] = []
+
+            case MethodKind.HEURISTIC:
+                jit_flags['JitMetrics'] = 1
+
+            case _:
+                raise ValueError("kind must be a known kind.")
+
+        result = {}
+        with SuperPmi(self.mch, self.core_root) as spmi:
+            for method in spmi.enumerate_methods(**jit_flags):
+                result[method.index] = method
+
+        with open(filename, 'w', encoding="utf8") as f:
+            json.dump([m.dict() for m in result.values()], f)
+
+        return result
+
+    def _get_cache(self, kind : MethodKind) -> Dict[int, MethodContext]:
+        """Gets the cache for the specified kind."""
+        if kind == MethodKind.UNKNOWN:
+            raise ValueError("kind must be a known kind.")
+
+        return self.no_cse if kind == MethodKind.NO_CSE else self.heuristic
+
 __all__ = [
-    SuperPmi.__name__,
     SuperPmiContext.__name__,
+    SuperPmi.__name__,
+    SuperPmiCache.__name__,
 ]
