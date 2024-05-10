@@ -129,7 +129,14 @@ class SuperPmi:
         return result
 
     def __translate_options(self, options:Dict[str,object]) -> List[str]:
-        return [f"{key}={value}" for key, value in options.items()]
+        result = []
+        for key, value in options.items():
+            if not isinstance(value, list):
+                result.append(f"{key}={value}")
+            else:
+                result.append(f"{key}={','.join(str(x) for x in value)}")
+
+        return result
 
     def enumerate_methods(self, **options) -> Iterable[MethodContext]:
         """List all methods in the mch file."""
@@ -231,6 +238,9 @@ class MethodKind(Enum):
 
 class SuperPmiCache:
     """A wrapper around superpmi that caches results to file."""
+    test_methods : List[MethodContext]
+    train_methods : List[MethodContext]
+
     def __init__(self, mch : str, core_root : str):
         self.mch = mch
         self.core_root = core_root
@@ -323,7 +333,7 @@ class SuperPmiCache:
             case _:
                 raise ValueError("kind must be a known kind.")
 
-    def get_single_cse_decisions(self, spmi : SuperPmi, progress_bar : bool = True) -> Dict[int, List[float]]:
+    def get_cse_perfscores(self, spmi : SuperPmi, progress_bar : bool = True) -> Dict[int, List[float]]:
         """Gets the perf scores for all single CSE decisions."""
         filename = SuperPmiCache._get_single_cse_file(self.mch)
 
@@ -331,26 +341,29 @@ class SuperPmiCache:
             with open(filename, 'r', encoding="utf8") as f:
                 return json.load(f)
 
-        result = {}
         if progress_bar:
             print("Caching single CSE decisions, this will take a while...")
 
         has_cses = [x for x in self.no_cse.values()
                     if x.cse_candidates and any(x for x in x.cse_candidates if x.can_apply)]
 
-        has_cses = tqdm.tqdm(has_cses) if progress_bar else has_cses
+        result = {}
+        progress = tqdm.tqdm(total=sum(len(x.cse_candidates) for x in has_cses)) if progress_bar else has_cses
         for method in has_cses:
+            scores = [None] * len(method.cse_candidates)
             for cse in method.cse_candidates:
-                scores = [None] * len(method.cse_candidates)
                 if cse.can_apply:
                     single = spmi.jit_method(method.index, JitMetrics=1, JitRLHook=1,
                                              JitRLHookCSEDecisions=[cse.index])
                     if single:
                         scores[cse.index] = single.perf_score
 
-                if any(scores):
-                    result[method.index] = scores
+            if any(scores):
+                result[method.index] = scores
 
+            progress.update(len(method.cse_candidates))
+
+        progress.close()
         with open(filename, 'w', encoding="utf8") as f:
             json.dump(result, f)
 
