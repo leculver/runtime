@@ -38,7 +38,6 @@ class CseCandidate(BaseModel):
     bb_count : int
     block_spread : int
     enreg_count : int
-    for_testing : Optional[bool] = False
 
     @field_validator('applied', 'viable', 'live_across_call', 'const', 'shared_const', 'make_cse', 'has_call',
                      'containable', mode='before')
