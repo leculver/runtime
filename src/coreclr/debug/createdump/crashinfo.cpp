@@ -293,10 +293,13 @@ CrashInfo::InitializeDAC(DumpType dumpType)
     // a full dump, but if the dump type requested is a mini, triage or heap and the DAC is next to the single-file
     // application the core dump will be generated. For NativeAOT, there is currently no DAC available so never
     // attempt to load it.
-    if ((dumpType == DumpType::Full && m_appModel == AppModelType::SingleFile) || m_appModel == AppModelType::NativeAOT)
+    if (m_appModel == AppModelType::NativeAOT)
     {
         return true;
     }
+    // For single-file full dumps, DAC is not required (all memory is included), but if available it provides
+    // useful managed exception info. Try to load it but don't fail if it's not found.
+    bool dacOptionalForSingleFile = (dumpType == DumpType::Full && m_appModel == AppModelType::SingleFile);
     // Can't load the DAC if the runtime wasn't found
     if (m_coreclrPath.empty())
     {
@@ -319,7 +322,13 @@ CrashInfo::InitializeDAC(DumpType dumpType)
     m_dacModule = dlopen(dacPath.c_str(), RTLD_LAZY);
     if (m_dacModule == nullptr)
     {
-        if (m_appModel == AppModelType::SingleFile)
+        if (dacOptionalForSingleFile)
+        {
+            // DAC is optional for single-file full dumps; dump will still contain all memory
+            TRACE("InitializeDAC: DAC not found for single-file app; full dump will still be generated\n");
+            return true;
+        }
+        else if (m_appModel == AppModelType::SingleFile)
         {
             printf_error("Only full dumps are supported by single file apps. Change the dump type to full (DOTNET_DbgMiniDumpType=4)\n");
         }
@@ -365,6 +374,28 @@ CrashInfo::InitializeDAC(DumpType dumpType)
     }
     result = true;
 exit:
+    // For single-file full dumps, DAC is optional - don't fail the dump if DAC initialization fails
+    if (!result && dacOptionalForSingleFile)
+    {
+        // Clean up any partial DAC initialization state
+        if (m_pClrDataEnumRegions != nullptr)
+        {
+            m_pClrDataEnumRegions->Release();
+            m_pClrDataEnumRegions = nullptr;
+        }
+        if (m_pClrDataProcess != nullptr)
+        {
+            m_pClrDataProcess->Release();
+            m_pClrDataProcess = nullptr;
+        }
+        if (m_dacModule != nullptr)
+        {
+            dlclose(m_dacModule);
+            m_dacModule = nullptr;
+        }
+        TRACE("InitializeDAC: DAC initialization failed for single-file app; full dump will still be generated\n");
+        return true;
+    }
     return result;
 }
 

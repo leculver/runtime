@@ -24,10 +24,17 @@ CreateDump(const CreateDumpOptions& options)
 #endif
     TRACE("PAGE_SIZE %d\n", PAGE_SIZE);
 
+    // For single-file and NativeAOT apps, crash report generation is not supported because DAC may not be available
+    // for managed frame gathering. However, we should still proceed with dump generation if requested (CreateDump).
+    // Issue: https://github.com/dotnet/diagnostics/issues/2515
     if (options.CrashReport && (options.AppModel == AppModelType::SingleFile || options.AppModel == AppModelType::NativeAOT))
     {
-        printf_error("The app model does not support crash report generation\n");
-        goto exit;
+        if (!options.CreateDump)
+        {
+            printf_error("The app model does not support crash report generation\n");
+            goto exit;
+        }
+        printf_status("Crash report generation is not supported for this app model; continuing with dump generation\n");
     }
 
     if (options.DumpType != DumpType::Full && options.AppModel == AppModelType::NativeAOT)
@@ -63,8 +70,8 @@ CreateDump(const CreateDumpOptions& options)
     {
         goto exit;
     }
-    // Write the crash report json file if enabled
-    if (options.CrashReport)
+    // Write the crash report json file if enabled (skip for single-file/NativeAOT since DAC-based frame gathering is not available)
+    if (options.CrashReport && options.AppModel != AppModelType::SingleFile && options.AppModel != AppModelType::NativeAOT)
     {
         CrashReportWriter crashReportWriter(*crashInfo);
         crashReportWriter.WriteCrashReport(dumpPath);
