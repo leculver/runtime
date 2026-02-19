@@ -8411,7 +8411,7 @@ Thread::EnumMemoryRegionsWorker(CLRDataEnumMemoryFlags flags)
             break;
         }
 
-        if (!IsAddressInStack(currentSP))
+        if (!IsAddressInStack(currentSP) && !IsExecutingOnAltStack())
         {
             _ASSERTE(!"Target stack has been corrupted, SP must be in the stack range.");
             break;

@@ -835,9 +835,9 @@ HRESULT ClrDataAccess::EnumMemWalkStackHelper(CLRDataEnumMemoryFlags flags,
                             break;
                         }
 
-                        if (!pThread->IsAddressInStack(currentSP))
+                        if (!pThread->IsAddressInStack(currentSP) && !pThread->IsExecutingOnAltStack())
                         {
-                            _ASSERTE(!"Target stack has been corrupted, SP must in the stack range.");
+                            _ASSERTE(!"Target stack has been corrupted, SP must be in the stack range.");
                             break;
                         }
                     }
