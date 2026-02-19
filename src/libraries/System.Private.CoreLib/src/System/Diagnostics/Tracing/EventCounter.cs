@@ -99,7 +99,7 @@ namespace System.Diagnostics.Tracing
             lock (this)
             {
                 Flush();
-                CounterPayload payload = new CounterPayload();
+                CounterPayload payload = _cachedPayload ??= new CounterPayload();
                 payload.Count = _count;
                 payload.IntervalSec = intervalSec;
                 if (0 < _count)
@@ -114,14 +114,21 @@ namespace System.Diagnostics.Tracing
                 }
                 payload.Min = _min;
                 payload.Max = _max;
-                payload.Series = $"Interval={pollingIntervalMillisec}"; // TODO: This may need to change when we support multi-session
+                if (_cachedSeriesString == null || _cachedPollingInterval != pollingIntervalMillisec)
+                {
+                    _cachedSeriesString = $"Interval={pollingIntervalMillisec}";
+                    _cachedPollingInterval = pollingIntervalMillisec;
+                }
+                payload.Series = _cachedSeriesString;
                 payload.CounterType = "Mean";
                 payload.Metadata = GetMetadataString();
                 payload.DisplayName = DisplayName ?? "";
                 payload.DisplayUnits = DisplayUnits ?? "";
                 payload.Name = Name;
                 ResetStatistics();
-                EventSource.Write("EventCounters", new EventSourceOptions() { Level = EventLevel.LogAlways }, new CounterPayloadType(payload));
+                CounterPayloadType payloadType = _cachedPayloadType ??= new CounterPayloadType(payload);
+                payloadType.Payload = payload;
+                EventSource.Write("EventCounters", new EventSourceOptions() { Level = EventLevel.LogAlways }, payloadType);
             }
         }
 
@@ -144,6 +151,10 @@ namespace System.Diagnostics.Tracing
         private const double UnusedBufferSlotValue = double.NegativeInfinity;
         private readonly double[] _bufferedValues;
         private volatile int _bufferedValuesIndex;
+        private CounterPayload? _cachedPayload;
+        private CounterPayloadType? _cachedPayloadType;
+        private string? _cachedSeriesString;
+        private int _cachedPollingInterval;
 
         private void Enqueue(double value)
         {

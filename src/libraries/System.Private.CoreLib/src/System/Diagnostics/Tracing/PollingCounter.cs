@@ -40,6 +40,10 @@ namespace System.Diagnostics.Tracing
 
         private readonly Func<double> _metricProvider;
         private double _lastVal;
+        private CounterPayload? _cachedPayload;
+        private PollingPayloadType? _cachedPayloadType;
+        private string? _cachedSeriesString;
+        private int _cachedPollingInterval;
 
         [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:RequiresUnreferencedCode",
             Justification = "The DynamicDependency will preserve the properties of CounterPayload")]
@@ -58,12 +62,17 @@ namespace System.Diagnostics.Tracing
                     ReportOutOfBandMessage($"ERROR: Exception during EventCounter {Name} metricProvider callback: " + ex.Message);
                 }
 
-                CounterPayload payload = new CounterPayload();
+                CounterPayload payload = _cachedPayload ??= new CounterPayload();
                 payload.Name = Name;
                 payload.DisplayName = DisplayName ?? "";
                 payload.Count = 1; // NOTE: These dumb-looking statistics is intentional
                 payload.IntervalSec = intervalSec;
-                payload.Series = $"Interval={pollingIntervalMillisec}";  // TODO: This may need to change when we support multi-session
+                if (_cachedSeriesString == null || _cachedPollingInterval != pollingIntervalMillisec)
+                {
+                    _cachedSeriesString = $"Interval={pollingIntervalMillisec}";
+                    _cachedPollingInterval = pollingIntervalMillisec;
+                }
+                payload.Series = _cachedSeriesString;
                 payload.CounterType = "Mean";
                 payload.Mean = value;
                 payload.Max = value;
@@ -72,7 +81,9 @@ namespace System.Diagnostics.Tracing
                 payload.StandardDeviation = 0;
                 payload.DisplayUnits = DisplayUnits ?? "";
                 _lastVal = value;
-                EventSource.Write("EventCounters", new EventSourceOptions() { Level = EventLevel.LogAlways }, new PollingPayloadType(payload));
+                PollingPayloadType payloadType = _cachedPayloadType ??= new PollingPayloadType(payload);
+                payloadType.Payload = payload;
+                EventSource.Write("EventCounters", new EventSourceOptions() { Level = EventLevel.LogAlways }, payloadType);
             }
         }
     }

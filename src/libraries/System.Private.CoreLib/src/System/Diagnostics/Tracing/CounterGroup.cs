@@ -28,13 +28,19 @@ namespace System.Diagnostics.Tracing
         internal void Add(DiagnosticCounter eventCounter)
         {
             lock (s_counterGroupLock) // Lock the CounterGroup
+            {
                 _counters.Add(eventCounter);
+                _countersSnapshotCache = null;
+            }
         }
 
         internal void Remove(DiagnosticCounter eventCounter)
         {
             lock (s_counterGroupLock) // Lock the CounterGroup
+            {
                 _counters.Remove(eventCounter);
+                _countersSnapshotCache = null;
+            }
         }
 
 #region EventSource Command Processing
@@ -147,6 +153,7 @@ namespace System.Diagnostics.Tracing
         private DateTime _timeStampSinceCollectionStarted;
         private int _pollingIntervalInMilliseconds;
         private DateTime _nextPollingTimeStamp;
+        private DiagnosticCounter[]? _countersSnapshotCache;
 
         private void EnableTimer(float pollingIntervalInSeconds)
         {
@@ -226,8 +233,15 @@ namespace System.Diagnostics.Tracing
                     now = DateTime.UtcNow;
                     elapsed = now - _timeStampSinceCollectionStarted;
                     pollingIntervalInMilliseconds = _pollingIntervalInMilliseconds;
-                    counters = new DiagnosticCounter[_counters.Count];
-                    _counters.CopyTo(counters);
+
+                    DiagnosticCounter[]? snapshot = _countersSnapshotCache;
+                    if (snapshot == null || snapshot.Length != _counters.Count)
+                    {
+                        snapshot = new DiagnosticCounter[_counters.Count];
+                        _countersSnapshotCache = snapshot;
+                    }
+                    _counters.CopyTo(snapshot);
+                    counters = snapshot;
                 }
 
                 // MUST keep out of the scope of s_counterGroupLock because this will cause WritePayload

@@ -47,6 +47,10 @@ namespace System.Diagnostics.Tracing
         public TimeSpan DisplayRateTimeScale { get; set; }
         private double _increment;
         private double _prevIncrement;
+        private IncrementingCounterPayload? _cachedPayload;
+        private IncrementingEventCounterPayloadType? _cachedPayloadType;
+        private string? _cachedSeriesString;
+        private int _cachedPollingInterval;
 
         public override string ToString() => $"IncrementingEventCounter '{Name}' Increment {_increment}";
 
@@ -57,18 +61,25 @@ namespace System.Diagnostics.Tracing
         {
             lock (this)     // Lock the counter
             {
-                IncrementingCounterPayload payload = new IncrementingCounterPayload();
+                IncrementingCounterPayload payload = _cachedPayload ??= new IncrementingCounterPayload();
                 payload.Name = Name;
                 payload.IntervalSec = intervalSec;
                 payload.DisplayName = DisplayName ?? "";
                 payload.DisplayRateTimeScale = (DisplayRateTimeScale == TimeSpan.Zero) ? "" : DisplayRateTimeScale.ToString("c");
-                payload.Series = $"Interval={pollingIntervalMillisec}"; // TODO: This may need to change when we support multi-session
+                if (_cachedSeriesString == null || _cachedPollingInterval != pollingIntervalMillisec)
+                {
+                    _cachedSeriesString = $"Interval={pollingIntervalMillisec}";
+                    _cachedPollingInterval = pollingIntervalMillisec;
+                }
+                payload.Series = _cachedSeriesString;
                 payload.CounterType = "Sum";
                 payload.Metadata = GetMetadataString();
                 payload.Increment = _increment - _prevIncrement;
                 payload.DisplayUnits = DisplayUnits ?? "";
                 _prevIncrement = _increment;
-                EventSource.Write("EventCounters", new EventSourceOptions() { Level = EventLevel.LogAlways }, new IncrementingEventCounterPayloadType(payload));
+                IncrementingEventCounterPayloadType payloadType = _cachedPayloadType ??= new IncrementingEventCounterPayloadType(payload);
+                payloadType.Payload = payload;
+                EventSource.Write("EventCounters", new EventSourceOptions() { Level = EventLevel.LogAlways }, payloadType);
             }
         }
 
