@@ -4974,21 +4974,14 @@ HRESULT ClrDataAccess::GetGenerationTableSvr(CLRDATA_ADDRESS heapAddr, unsigned 
     {
         TADDR heapAddress = TO_TADDR(heapAddr);
 
-        if (heapAddress != 0)
+        for (unsigned int i = 0; i < numGenerationTableEntries; ++i)
         {
-            for (unsigned int i = 0; i < numGenerationTableEntries; ++i)
-            {
-                dac_generation generation = ServerGenerationTableIndex(heapAddress, i);
-                pGenerationData[i].start_segment = (CLRDATA_ADDRESS)dac_cast<TADDR>(generation.start_segment);
-                pGenerationData[i].allocation_start = (CLRDATA_ADDRESS)(ULONG_PTR)generation.allocation_start;
-                gc_alloc_context alloc_context = generation.allocation_context;
-                pGenerationData[i].allocContextPtr = (CLRDATA_ADDRESS)(ULONG_PTR)alloc_context.alloc_ptr;
-                pGenerationData[i].allocContextLimit = (CLRDATA_ADDRESS)(ULONG_PTR)alloc_context.alloc_limit;
-            }
-        }
-        else
-        {
-            hr = E_FAIL;
+            dac_generation generation = ServerGenerationTableIndex(heapAddress, i);
+            pGenerationData[i].start_segment = (CLRDATA_ADDRESS)dac_cast<TADDR>(generation.start_segment);
+            pGenerationData[i].allocation_start = (CLRDATA_ADDRESS)(ULONG_PTR)generation.allocation_start;
+            gc_alloc_context alloc_context = generation.allocation_context;
+            pGenerationData[i].allocContextPtr = (CLRDATA_ADDRESS)(ULONG_PTR)alloc_context.alloc_ptr;
+            pGenerationData[i].allocContextLimit = (CLRDATA_ADDRESS)(ULONG_PTR)alloc_context.alloc_limit;
         }
     }
 #else
@@ -5023,20 +5016,13 @@ HRESULT ClrDataAccess::GetFinalizationFillPointersSvr(CLRDATA_ADDRESS heapAddr, 
     else
     {
         TADDR heapAddress = TO_TADDR(heapAddr);
-        if (heapAddress != 0)
+        dac_gc_heap heap = LoadGcHeapData(heapAddress);
+        dac_gc_heap* pHeap = &heap;
+        DPTR(dac_finalize_queue) fq = pHeap->finalize_queue;
+        DPTR(uint8_t*) pFillPointerArray= dac_cast<TADDR>(fq) + offsetof(dac_finalize_queue, m_FillPointers);
+        for (unsigned int i = 0; i < numFillPointers; ++i)
         {
-            dac_gc_heap heap = LoadGcHeapData(heapAddress);
-            dac_gc_heap* pHeap = &heap;
-            DPTR(dac_finalize_queue) fq = pHeap->finalize_queue;
-            DPTR(uint8_t*) pFillPointerArray= dac_cast<TADDR>(fq) + offsetof(dac_finalize_queue, m_FillPointers);
-            for (unsigned int i = 0; i < numFillPointers; ++i)
-            {
-                pFinalizationFillPointers[i] = (CLRDATA_ADDRESS) pFillPointerArray[i];
-            }
-        }
-        else
-        {
-            hr = E_FAIL;
+            pFinalizationFillPointers[i] = (CLRDATA_ADDRESS) pFillPointerArray[i];
         }
     }
 #else
