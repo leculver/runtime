@@ -30,39 +30,31 @@ InterpreterExecutionControl* InterpreterExecutionControl::GetInstance()
     return &s_instance;
 }
 
-bool InterpreterExecutionControl::ApplyPatch(DebuggerControllerPatch* patch)
+bool InterpreterExecutionControl::ApplyPatch(CORDB_ADDRESS_TYPE* address, PRD_TYPE& originalOpcode)
 {
-    _ASSERTE(patch != NULL);
-    _ASSERTE(!patch->IsActivated());
-    _ASSERTE(patch->IsBound());
+    _ASSERTE(address != NULL);
 
-    LOG((LF_CORDB, LL_INFO10000, "InterpreterEC::ApplyPatch %p at bytecode addr %p\n",
-        patch, patch->address));
+    LOG((LF_CORDB, LL_INFO10000, "InterpreterEC::ApplyPatch at bytecode addr %p\n", address));
 
-    patch->opcode = *(int32_t*)patch->address;
-    *(uint32_t*)patch->address = INTOP_BREAKPOINT;
+    originalOpcode = *(int32_t*)address;
+    *(uint32_t*)address = INTOP_BREAKPOINT;
 
     LOG((LF_CORDB, LL_EVERYTHING, "InterpreterEC::ApplyPatch Breakpoint inserted at %p, saved opcode %x\n",
-        patch->address, patch->opcode));
+        address, originalOpcode));
 
     return true;
 }
 
-bool InterpreterExecutionControl::UnapplyPatch(DebuggerControllerPatch* patch)
+bool InterpreterExecutionControl::UnapplyPatch(CORDB_ADDRESS_TYPE* address, PRD_TYPE originalOpcode)
 {
-    _ASSERTE(patch != NULL);
-    _ASSERTE(patch->address != NULL);
-    _ASSERTE(patch->IsActivated());
+    _ASSERTE(address != NULL);
 
-    LOG((LF_CORDB, LL_INFO1000, "InterpreterEC::UnapplyPatch %p at bytecode addr %p, replacing with original opcode 0x%x\n",
-        patch, patch->address, patch->opcode));
+    LOG((LF_CORDB, LL_INFO1000, "InterpreterEC::UnapplyPatch at bytecode addr %p, replacing with original opcode 0x%x\n",
+        address, originalOpcode));
 
-    // Restore the original opcode
-    *(uint32_t*)patch->address = (uint32_t)patch->opcode; // Opcodes are stored in uint32_t slots
-    InitializePRD(&(patch->opcode));
+    *(uint32_t*)address = (uint32_t)originalOpcode;
 
-    LOG((LF_CORDB, LL_EVERYTHING, "InterpreterEC::UnapplyPatch Restored opcode at %p\n",
-        patch->address));
+    LOG((LF_CORDB, LL_EVERYTHING, "InterpreterEC::UnapplyPatch Restored opcode at %p\n", address));
 
     return true;
 }

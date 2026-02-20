@@ -1534,7 +1534,7 @@ bool DebuggerController::ApplyPatch(DebuggerControllerPatch *patch)
             {
                 IExecutionControl* pExecControl = pJitManager->GetExecutionControl();
                 _ASSERTE(pExecControl != NULL);
-                return pExecControl->ApplyPatch(patch);
+                return pExecControl->ApplyPatch(patch->address, patch->opcode);
             }
         }
 #endif // FEATURE_INTERPRETER
@@ -1661,7 +1661,9 @@ bool DebuggerController::UnapplyPatch(DebuggerControllerPatch *patch)
             {
                 IExecutionControl* pExecControl = pJitManager->GetExecutionControl();
                 _ASSERTE(pExecControl != NULL);
-                return pExecControl->UnapplyPatch(patch);
+                bool result = pExecControl->UnapplyPatch(patch->address, patch->opcode);
+                InitializePRD(&(patch->opcode));
+                return result;
             }
         }
 #endif // FEATURE_INTERPRETER

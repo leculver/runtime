@@ -12,7 +12,13 @@
 #ifndef EXECUTIONCONTROL_H_
 #define EXECUTIONCONTROL_H_
 
-struct DebuggerControllerPatch;
+#ifndef CORDB_ADDRESS_TYPE
+typedef const BYTE                  CORDB_ADDRESS_TYPE;
+#endif
+
+#ifndef PRD_TYPE
+#define PRD_TYPE                    DWORD_PTR
+#endif
 
 #ifdef FEATURE_INTERPRETER
 
@@ -22,8 +28,8 @@ class IExecutionControl
 public:
     virtual ~IExecutionControl() = default;
 
-    virtual bool ApplyPatch(DebuggerControllerPatch* patch) = 0;
-    virtual bool UnapplyPatch(DebuggerControllerPatch* patch) = 0;
+    virtual bool ApplyPatch(CORDB_ADDRESS_TYPE* address, PRD_TYPE& originalOpcode) = 0;
+    virtual bool UnapplyPatch(CORDB_ADDRESS_TYPE* address, PRD_TYPE originalOpcode) = 0;
 };
 
 typedef DPTR(IExecutionControl) PTR_IExecutionControl;
@@ -34,11 +40,11 @@ class InterpreterExecutionControl : public IExecutionControl
 public:
     static InterpreterExecutionControl* GetInstance();
 
-    // Apply a breakpoint patch
-    virtual bool ApplyPatch(DebuggerControllerPatch* patch) override;
+    // Apply a breakpoint patch -- saves the original opcode and writes a breakpoint
+    virtual bool ApplyPatch(CORDB_ADDRESS_TYPE* address, PRD_TYPE& originalOpcode) override;
 
-    // Remove a breakpoint patch and restore original instruction
-    virtual bool UnapplyPatch(DebuggerControllerPatch* patch) override;
+    // Remove a breakpoint patch -- restores the original opcode
+    virtual bool UnapplyPatch(CORDB_ADDRESS_TYPE* address, PRD_TYPE originalOpcode) override;
 
 private:
     InterpreterExecutionControl() = default;
