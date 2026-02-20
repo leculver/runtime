@@ -433,6 +433,7 @@ struct DebuggerControllerPatch
     PTR_CORDB_ADDRESS_TYPE  address;
     FramePointer            fp;
     PRD_TYPE                opcode; // See description above.
+    bool                    m_activated; // Explicit activation flag (replaces PRDIsEmpty(opcode) check)
     BOOL                    fSaveOpcode;
     PRD_TYPE                opcodeSaved;
     BOOL                    offsetIsIL;
@@ -521,7 +522,7 @@ public:
     {
         if( address == NULL ) {
             // patch is unbound, cannot be active
-            _ASSERTE( PRDIsEmpty(opcode) );
+            _ASSERTE( !m_activated );
             return FALSE;
         }
 
@@ -538,9 +539,9 @@ public:
 
     bool IsActivated()
     {
-        // Patch is activate if we've stored a non-zero opcode
-        // Note: this might be a problem as opcode 0 may be a valid opcode (see issue 366221).
-        if( PRDIsEmpty(opcode) ) {
+        // Use explicit flag instead of PRDIsEmpty(opcode) since opcode 0 can be valid
+        // (e.g. INTOP_RET in the interpreter). See https://github.com/dotnet/runtime/issues/124499
+        if( !m_activated ) {
             return FALSE;
         }
 

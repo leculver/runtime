@@ -676,6 +676,7 @@ DebuggerControllerPatch *DebuggerPatchTable::AddPatchForMethodDef(DebuggerContro
 
     //initialize the patch data structure.
     InitializePRD(&(patch->opcode));
+    patch->m_activated = false;
     patch->controller = controller;
     patch->key.module = module;
     patch->key.md = md;
@@ -782,6 +783,7 @@ DebuggerControllerPatch *DebuggerPatchTable::AddPatchForAddress(DebuggerControll
 
     // initialize the patch data structure
     InitializePRD(&(patch->opcode));
+    patch->m_activated = false;
     patch->controller = controller;
 
     if (fd == NULL)
@@ -1521,6 +1523,7 @@ bool DebuggerController::ApplyPatch(DebuggerControllerPatch *patch)
             // We only used SaveOpcode for when we've moved code, so
             // the patch should already be there.
             patch->opcode = patch->opcodeSaved;
+            patch->m_activated = true;
             _ASSERTE( AddressIsBreakpoint(patch->address) );
             return true;
         }
@@ -1616,6 +1619,7 @@ bool DebuggerController::ApplyPatch(DebuggerControllerPatch *patch)
     }
 #endif //TARGET_X86
 
+    patch->m_activated = true;
     return true;
 }
 
@@ -1648,6 +1652,7 @@ bool DebuggerController::UnapplyPatch(DebuggerControllerPatch *patch)
             // overwrite something if we don't get moved far enough.
             patch->opcodeSaved = patch->opcode;
             InitializePRD(&(patch->opcode));
+            patch->m_activated = false;
             _ASSERTE( !patch->IsActivated() );
             return true;
         }
@@ -1685,6 +1690,7 @@ bool DebuggerController::UnapplyPatch(DebuggerControllerPatch *patch)
                 // error in this case.
                 //
                 InitializePRD(&(patch->opcode));
+                patch->m_activated = false;
                 return false;
             }
         }
@@ -1696,6 +1702,7 @@ bool DebuggerController::UnapplyPatch(DebuggerControllerPatch *patch)
         // this patch for an active one on ReadMem/WriteMem (see
         // header file comment).
         InitializePRD(&(patch->opcode));
+        patch->m_activated = false;
 
 #if !defined(HOST_OSX) || !defined(HOST_ARM64)
         if (!VirtualProtect(baseAddress,
@@ -1723,6 +1730,7 @@ bool DebuggerController::UnapplyPatch(DebuggerControllerPatch *patch)
                 // error in this case.
                 //
                 InitializePRD(&(patch->opcode));
+                patch->m_activated = false;
                 return false;
             }
         }
@@ -1743,6 +1751,7 @@ bool DebuggerController::UnapplyPatch(DebuggerControllerPatch *patch)
         // this patch for an active one on ReadMem/WriteMem (see
         // header file comment.
         InitializePRD(&(patch->opcode));
+        patch->m_activated = false;
 
         if (!VirtualProtect((void *) patch->address, 2, oldProt, &oldProt))
         {
@@ -1904,6 +1913,7 @@ BOOL DebuggerController::CheckGetPatchedOpcode(CORDB_ADDRESS_TYPE *address,
             LOG((LF_CORDB, LL_INFO10000, "DC::ActivatePatch: There is another patch at this address, no need to apply it.\n"));
             p->LogInstance();
             patch->opcode = p->opcode;
+            patch->m_activated = true;
             fApply = false;
             break;
         }
@@ -1959,6 +1969,7 @@ void DebuggerController::DeactivatePatch(DebuggerControllerPatch *patch)
             p->LogInstance();
             fUnapply = false;
             InitializePRD(&(patch->opcode));
+            patch->m_activated = false;
             break;
         }
     }

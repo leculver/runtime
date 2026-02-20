@@ -476,6 +476,7 @@ HRESULT DebuggerRCThread::SetupRuntimeOffsets(DebuggerIPCControlBlock * pDebugge
     pDebuggerRuntimeOffsets->m_offAddr = offsetof(DebuggerControllerPatch, address);
     pDebuggerRuntimeOffsets->m_offOpcode = offsetof(DebuggerControllerPatch, opcode);
     pDebuggerRuntimeOffsets->m_cbOpcode = sizeof(PRD_TYPE);
+    pDebuggerRuntimeOffsets->m_offActivated = offsetof(DebuggerControllerPatch, m_activated);
     pDebuggerRuntimeOffsets->m_offTraceType = offsetof(DebuggerControllerPatch, trace.type);
     pDebuggerRuntimeOffsets->m_traceTypeUnmanaged = TRACE_UNMANAGED;
 

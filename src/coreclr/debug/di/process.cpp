@@ -7003,9 +7003,11 @@ HRESULT CordbProcess::RefreshPatchTable(CORDB_ADDRESS address, SIZE_T size, BYTE
                 BYTE *DebuggerControllerPatch = m_pPatchTable + m_runtimeOffsets.m_cbPatch * iPatch;
                 PRD_TYPE opcode = *(PRD_TYPE*)(DebuggerControllerPatch + m_runtimeOffsets.m_offOpcode);
                 CORDB_ADDRESS patchAddress = PTR_TO_CORDB_ADDRESS(*(BYTE**)(DebuggerControllerPatch + m_runtimeOffsets.m_offAddr));
+                bool activated = *(bool*)(DebuggerControllerPatch + m_runtimeOffsets.m_offActivated);
 
-                // A non-zero opcode indicates to us that this patch is valid.
-                if (!PRDIsEmpty(opcode))
+                // The m_activated flag indicates this patch is valid (replaces PRDIsEmpty(opcode) check
+                // since opcode 0 is valid for some execution engines like the interpreter).
+                if (activated)
                 {
                     _ASSERTE( patchAddress != 0 );
 
