@@ -1816,55 +1816,18 @@ HRESULT ClrDataAccess::EnumMemoryRegionsWorkerMicroTriage(IN CLRDataEnumMemoryFl
     return S_OK;
 }
 
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-//
-// Write out mscorwks's data segment. This will write out the whole
-// data segment for mscorwks. It is about 200 or 300K. Most of it (90%) are
-// vtable definition that we don't really care. But we don't have a
-// good walk to just write out all globals and statics.
-//
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-HRESULT ClrDataAccess::EnumMemWriteDataSegment()
-{
-    SUPPORTS_DAC;
-
-    NewHolder<PEDecoder> pedecoder(NULL);
-
-    EX_TRY
-    {
-        // Collecting mscorwks's data segment
-        {
-            // m_globalBase is the base address of target process's mscorwks module
-            pedecoder = new PEDecoder(dac_cast<PTR_VOID>(m_globalBase));
-
-            PTR_IMAGE_SECTION_HEADER pSection = (PTR_IMAGE_SECTION_HEADER) pedecoder->FindFirstSection();
-            PTR_IMAGE_SECTION_HEADER pSectionEnd = pSection + VAL16(pedecoder->GetNumberOfSections());
-
-            while (pSection < pSectionEnd)
-            {
-                if (pSection->Name[0] == '.' &&
-                    pSection->Name[1] == 'd' &&
-                    pSection->Name[2] == 'a' &&
-                    pSection->Name[3] == 't' &&
-                    pSection->Name[4] == 'a')
-                {
-                    // This is the .data section of mscorwks
-                    ReportMem(m_globalBase + pSection->VirtualAddress, pSection->Misc.VirtualSize);
-                }
-                pSection++;
-             }
-        }
-    }
-    EX_CATCH_RETHROW_ONLY_COR_E_OPERATIONCANCELLED
-
-    return S_OK;
-}
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
-// Custom Dump. Depending on the value of g_ECustomDumpFlavor, different dump
-// will be taken. You can set this global variable using hosting API
-// ICLRErrorReportingManager::BeginCustomDump.
+// Custom Dump
+//
+// Historically, Desktop CLR supported multiple dump "flavors" via the
+// ICLRErrorReportingManager::BeginCustomDump hosting API, which set a
+// global g_ECustomDumpFlavor variable. CoreCLR never implemented that
+// hosting API, so the flavor was always hardcoded to DUMP_FLAVOR_Default
+// (== DUMP_FLAVOR_Mini). The DUMP_FLAVOR_CriticalCLRState and
+// DUMP_FLAVOR_NonHeapCLRState branches were unreachable dead code and
+// have been removed.
 //
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 HRESULT ClrDataAccess::EnumMemoryRegionsWorkerCustom()
@@ -1873,84 +1836,22 @@ HRESULT ClrDataAccess::EnumMemoryRegionsWorkerCustom()
 
     HRESULT status = S_OK;
 
-    ECustomDumpFlavor eFlavor;
-
-    eFlavor = DUMP_FLAVOR_Default;
-
     m_enumMemFlags = CLRDATA_ENUM_MEM_MINI;
 
     // clear all of the previous cached memory
     Flush();
 
-    if (eFlavor == DUMP_FLAVOR_Mini)
-    {
-        // Iterating to all threads' stacks
-        CATCH_ALL_EXCEPT_RETHROW_COR_E_OPERATIONCANCELLED( status = EnumMemDumpAllThreadsStack(m_enumMemFlags); )
+    // Iterating to all threads' stacks
+    CATCH_ALL_EXCEPT_RETHROW_COR_E_OPERATIONCANCELLED( status = EnumMemDumpAllThreadsStack(m_enumMemFlags); )
 
-        // Iterating to module list.
-        CATCH_ALL_EXCEPT_RETHROW_COR_E_OPERATIONCANCELLED( status = EnumMemDumpModuleList(m_enumMemFlags); )
+    // Iterating to module list.
+    CATCH_ALL_EXCEPT_RETHROW_COR_E_OPERATIONCANCELLED( status = EnumMemDumpModuleList(m_enumMemFlags); )
 
-        //
-        // iterating through static that we care
-        //
-        // collect CLR static
-        CATCH_ALL_EXCEPT_RETHROW_COR_E_OPERATIONCANCELLED( status = EnumMemCLRStatic(m_enumMemFlags); )
+    // collect CLR static
+    CATCH_ALL_EXCEPT_RETHROW_COR_E_OPERATIONCANCELLED( status = EnumMemCLRStatic(m_enumMemFlags); )
 
-        // we are done...
-
-        // now dump the memory get dragged in implicitly
-        m_dumpStats.m_cbImplicitly = m_instances.DumpAllInstances(m_enumMemCb);
-
-    }
-    else if (eFlavor == DUMP_FLAVOR_CriticalCLRState)
-    {
-        // We need to walk Threads stack to view managed frames.
-        // Iterating through module list
-
-        // Iterating to all threads' stacks
-        CATCH_ALL_EXCEPT_RETHROW_COR_E_OPERATIONCANCELLED( status = EnumMemDumpAllThreadsStack(m_enumMemFlags); )
-
-        // Iterating to module list.
-        CATCH_ALL_EXCEPT_RETHROW_COR_E_OPERATIONCANCELLED( status = EnumMemDumpModuleList(m_enumMemFlags); )
-
-        //
-        // iterating through static that we care
-        //
-        // collect CLR static
-        CATCH_ALL_EXCEPT_RETHROW_COR_E_OPERATIONCANCELLED( status = EnumMemCLRStatic(m_enumMemFlags); )
-
-        // Collecting some CLR secondary critical data
-        CATCH_ALL_EXCEPT_RETHROW_COR_E_OPERATIONCANCELLED( status = EnumMemCLRHeapCrticalStatic(m_enumMemFlags); )
-        CATCH_ALL_EXCEPT_RETHROW_COR_E_OPERATIONCANCELLED( status = EnumMemWriteDataSegment(); )
-
-        // we are done...
-
-        // now dump the memory get dragged in implicitly
-        m_dumpStats.m_cbImplicitly = m_instances.DumpAllInstances(m_enumMemCb);
-
-    }
-    else if (eFlavor == DUMP_FLAVOR_NonHeapCLRState)
-    {
-        // since all CLR hosted heap will be dump by the host,
-        // the EE structures that are not loaded using LoadLibrary will
-        // be included by the host.
-        //
-        // Thus we only need to include mscorwks's critical data and ngen images
-
-        m_enumMemFlags = CLRDATA_ENUM_MEM_HEAP;
-
-        CATCH_ALL_EXCEPT_RETHROW_COR_E_OPERATIONCANCELLED( status = EnumMemCLRStatic(m_enumMemFlags); )
-
-        // Collecting some CLR secondary critical data
-        CATCH_ALL_EXCEPT_RETHROW_COR_E_OPERATIONCANCELLED( status = EnumMemCLRHeapCrticalStatic(m_enumMemFlags); )
-
-        CATCH_ALL_EXCEPT_RETHROW_COR_E_OPERATIONCANCELLED( status = EnumMemWriteDataSegment(); )
-        CATCH_ALL_EXCEPT_RETHROW_COR_E_OPERATIONCANCELLED( status = EnumMemCollectImages(); )
-    }
-    else
-    {
-        status = E_INVALIDARG;
-    }
+    // now dump the memory get dragged in implicitly
+    m_dumpStats.m_cbImplicitly = m_instances.DumpAllInstances(m_enumMemCb);
 
     return S_OK;
 }

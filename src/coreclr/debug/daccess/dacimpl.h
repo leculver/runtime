@@ -1320,8 +1320,6 @@ public:
     HRESULT EnumMemStowedException(CLRDataEnumMemoryFlags flags);
 #endif
 
-    HRESULT EnumMemWriteDataSegment();
-
     // Custom Dump
     HRESULT EnumMemoryRegionsWorkerCustom();
 
