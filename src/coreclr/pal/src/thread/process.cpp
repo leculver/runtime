@@ -1396,7 +1396,7 @@ static uint64_t HashSemaphoreName(uint64_t a, uint64_t b)
 #endif
 
 static const char *const TwoWayNamedPipePrefix = "clr-debug-pipe";
-static const char* IpcNameFormat = "%s-%d-%llu-%s";
+
 
 #ifdef ENABLE_RUNTIME_EVENTS_OVER_PIPES
 static const char* RuntimeStartupPipeName = "st";
@@ -2037,13 +2037,9 @@ PAL_GetTransportName(
         }
     }
 
-    if (strncat_s(formatBuffer, MAX_TRANSPORT_NAME_LENGTH, IpcNameFormat, strlen(IpcNameFormat)) == STRUNCATE)
-    {
-        ERROR("TransportPipeName was larger than MAX_TRANSPORT_NAME_LENGTH");
-        return;
-    }
-
-    int chars = snprintf(name, MAX_TRANSPORT_NAME_LENGTH, formatBuffer, prefix, id, disambiguationKey, suffix);
+    // Use formatBuffer (temp path) as a data argument, not as part of the format string,
+    // to avoid interpreting any printf format specifiers that may be in the path (e.g. TMPDIR="/tmp/%d").
+    int chars = snprintf(name, MAX_TRANSPORT_NAME_LENGTH, "%s" "%s-%d-%llu-%s", formatBuffer, prefix, id, disambiguationKey, suffix);
     _ASSERTE(chars > 0 && (unsigned int)chars < MAX_TRANSPORT_NAME_LENGTH);
 }
 
