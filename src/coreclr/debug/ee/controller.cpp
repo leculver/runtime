@@ -7695,15 +7695,14 @@ bool DebuggerStepper::TriggerSingleStep(Thread *thread, const BYTE *ip)
     if (!g_pEEInterface->IsManagedNativeCode(ip))
     {
         LOG((LF_CORDB,LL_INFO10000, "DS::TSS: not in managed code, Returning false (case 0)!\n"));
-        // Sometimes we can get here with a callstack that is coming from an APC
-        // this will disable the single stepping and incorrectly resume an app that the user
-        // is stepping through.
-#ifdef FEATURE_THREAD_ACTIVATION
-        if ((thread->m_State & Thread::TS_DebugWillSync) == 0)
-#endif // FEATURE_THREAD_ACTIVATION
-        {
-            DisableSingleStep();
-        }
+        // Do not disable single-stepping when we land in non-managed code.
+        // An APC or thread activation (e.g., for GC suspension) can redirect
+        // the thread into native code while single-stepping is active. If we
+        // called DisableSingleStep() here, the stepper would be killed and the
+        // debugger would behave as if the user pressed Continue instead of
+        // Step Over. By preserving the single-step state, the dispatch loop
+        // in ScanForTriggers will re-apply the hardware trace flag, and
+        // single-stepping will resume once execution returns to managed code.
         return false;
     }
 
