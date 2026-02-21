@@ -95,15 +95,21 @@ public class DataDescriptorModel
         private string _baseline;
         private readonly string _baselinesDir;
         private bool _baselineParsed;
+        private readonly bool _baselineFromCommandLine;
         private readonly Dictionary<string, TypeModelBuilder> _types = new();
         private readonly Dictionary<string, GlobalBuilder> _globals = new();
         private readonly Dictionary<string, GlobalBuilder> _subDescriptors = new();
         private readonly Dictionary<string, ContractBuilder> _contracts = new();
-        public Builder(string baselinesDir)
+        public Builder(string baselinesDir, string? baselineNameOverride = null)
         {
             _baseline = string.Empty;
             _baselineParsed = false;
             _baselinesDir = baselinesDir;
+            _baselineFromCommandLine = baselineNameOverride != null;
+            if (baselineNameOverride != null)
+            {
+                SetBaseline(baselineNameOverride);
+            }
         }
 
         public uint PlatformFlags {get; set;}
@@ -167,6 +173,11 @@ public class DataDescriptorModel
 
         public void SetBaseline(string baseline)
         {
+            if (_baselineFromCommandLine && _baselineParsed)
+            {
+                // Baseline was set via command line; ignore the one from the object file.
+                return;
+            }
             if (_baseline != string.Empty && _baseline != baseline)
             {
                 throw new InvalidOperationException($"Baseline already set to {_baseline} cannot set to {baseline}");
