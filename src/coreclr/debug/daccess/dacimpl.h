@@ -1420,6 +1420,11 @@ public:
     ULONG32 m_instanceAge;
     bool m_debugMode;
 
+    // Cached result of DebuggerController::GetPatchTableValid() and patch
+    // existence check.  During dump enumeration the target is frozen so this
+    // cannot change.  -1 = not yet checked, 0 = no patches, 1 = has patches.
+    int m_nPatchTableValid;
+
     // This currently exists on the DAC as a way of managing lifetime of loading/freeing the cdac
     // TODO: [cdac] Remove when cDAC deploys with SOS - https://github.com/dotnet/runtime/issues/108720
     CDAC m_cdac;

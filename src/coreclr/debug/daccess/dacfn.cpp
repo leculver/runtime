@@ -1346,10 +1346,47 @@ HRESULT DacReplacePatchesInHostMemory(MemoryRange range, PVOID pBuffer)
 {
     SUPPORTS_DAC;
 
-    // If the patch table is invalid, then there is no patch to replace.
-    if (!DebuggerController::GetPatchTableValid())
+    // Cache the patch table validity and emptiness across calls.  During dump
+    // enumeration the target process is frozen so the patch state cannot change.
+    // Walking the patch hash table on every stack frame is extremely expensive
+    // because each entry access goes through DacInstantiateTypeByAddressHelper
+    // and DacInstanceManager::Find with a fixed-bucket hash table.  For stack-
+    // overflow scenarios with 100k+ frames this dominated dump creation time.
+    // See https://github.com/dotnet/runtime/issues/122459
+    if (g_dacImpl != nullptr)
     {
-        return S_OK;
+        if (g_dacImpl->m_nPatchTableValid == 0)
+        {
+            return S_OK;
+        }
+
+        if (g_dacImpl->m_nPatchTableValid == -1)
+        {
+            if (!DebuggerController::GetPatchTableValid())
+            {
+                g_dacImpl->m_nPatchTableValid = 0;
+                return S_OK;
+            }
+
+            HASHFIND info;
+            DebuggerPatchTable * pTable = DebuggerController::GetPatchTable();
+            DebuggerControllerPatch * pPatch = pTable->GetFirstPatch(&info);
+            if (pPatch == NULL)
+            {
+                g_dacImpl->m_nPatchTableValid = 0;
+                return S_OK;
+            }
+
+            g_dacImpl->m_nPatchTableValid = 1;
+        }
+    }
+    else
+    {
+        // Fallback: no cache available, check directly.
+        if (!DebuggerController::GetPatchTableValid())
+        {
+            return S_OK;
+        }
     }
 
     HASHFIND info;

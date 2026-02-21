@@ -3100,6 +3100,7 @@ ClrDataAccess::ClrDataAccess(ICorDebugDataTarget * pTarget, ICLRDataTarget * pLe
     m_updateMemCb = NULL;
     m_logMessageCb = NULL;
     m_enumMemFlags = (CLRDataEnumMemoryFlags)-1;    // invalid
+    m_nPatchTableValid = -1;
     m_jitNotificationTable = NULL;
 
 #ifdef FEATURE_MINIMETADATA_IN_TRIAGEDUMPS
