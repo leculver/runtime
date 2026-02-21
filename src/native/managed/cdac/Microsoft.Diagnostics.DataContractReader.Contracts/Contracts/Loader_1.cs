@@ -273,6 +273,17 @@ internal readonly struct Loader_1 : ILoader
         return typeHashTable.Entries.Select(entry => entry.TypeHandle);
     }
 
+    IEnumerable<TargetPointer> ILoader.GetAvailableTypeParamsByHash(ModuleHandle handle, uint hash)
+    {
+        Data.Module module = _target.ProcessedData.GetOrAdd<Data.Module>(handle.Address);
+
+        if (module.AvailableTypeParams == TargetPointer.Null)
+            return [];
+
+        EETypeHashTable typeHashTable = _target.ProcessedData.GetOrAdd<EETypeHashTable>(module.AvailableTypeParams);
+        return typeHashTable.FindByHash(hash).Select(entry => entry.TypeHandle);
+    }
+
     IEnumerable<TargetPointer> ILoader.GetInstantiatedMethods(ModuleHandle handle)
     {
         Data.Module module = _target.ProcessedData.GetOrAdd<Data.Module>(handle.Address);

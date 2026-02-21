@@ -766,6 +766,34 @@ internal partial struct RuntimeTypeSystem_1 : IRuntimeTypeSystem
 
     }
 
+    // DJB2-style hash matching the runtime's HashTypeKey in typehash.cpp.
+    // Used for bucket-based lookup in EETypeHashTable.
+    private uint HashConstructedType(TypeHandle typeHandle, CorElementType corElementType, ImmutableArray<TypeHandle> typeArguments)
+    {
+        unchecked
+        {
+            if (corElementType == CorElementType.GenericInst)
+            {
+                // Matches HashPossiblyInstantiatedType(token, inst)
+                nint dwHash = 5381;
+                dwHash = ((dwHash << 5) + dwHash) ^ (nint)(uint)GetTypeDefToken(typeHandle);
+                for (int i = 0; i < typeArguments.Length; i++)
+                {
+                    dwHash = ((dwHash << 5) + dwHash) ^ (nint)typeArguments[i].Address.Value;
+                }
+                return (uint)dwHash;
+            }
+            else
+            {
+                // Matches HashParamType(kind, typeParam) for array/ptr/byref types
+                nint dwHash = 5381;
+                dwHash = ((dwHash << 5) + dwHash) ^ (nint)(byte)corElementType;
+                dwHash = ((dwHash << 5) + dwHash) ^ (nint)typeHandle.Address.Value;
+                return (uint)dwHash;
+            }
+        }
+    }
+
     private bool IsLoaded(TypeHandle typeHandle)
     {
         if (typeHandle.Address == TargetPointer.Null)
@@ -791,7 +819,10 @@ internal partial struct RuntimeTypeSystem_1 : IRuntimeTypeSystem
         TargetPointer loaderModule = GetLoaderModule(typeHandle);
         ModuleHandle moduleHandle = loaderContract.GetModuleHandleFromModulePtr(loaderModule);
         TypeHandle potentialMatch;
-        foreach (TargetPointer ptr in loaderContract.GetAvailableTypeParams(moduleHandle))
+
+        // Use hash-based bucket lookup to avoid linear scan of all entries
+        uint hash = HashConstructedType(typeHandle, corElementType, typeArguments);
+        foreach (TargetPointer ptr in loaderContract.GetAvailableTypeParamsByHash(moduleHandle, hash))
         {
             potentialMatch = GetTypeHandle(ptr);
             if (corElementType == CorElementType.GenericInst)

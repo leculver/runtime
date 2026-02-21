@@ -149,6 +149,7 @@ struct cdac_data<EETypeHashTable>
 
     static constexpr size_t VolatileEntryValue = offsetof(EETypeHashTable::VolatileEntry, m_sValue);
     static constexpr size_t VolatileEntryNextEntry = offsetof(EETypeHashTable::VolatileEntry, m_pNextEntry);
+    static constexpr size_t VolatileEntryHashValue = offsetof(EETypeHashTable::VolatileEntry, m_iHashValue);
 };
 
 #endif /* _TYPE_HASH_H */

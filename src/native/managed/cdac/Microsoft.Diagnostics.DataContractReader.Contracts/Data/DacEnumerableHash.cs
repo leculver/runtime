@@ -13,6 +13,7 @@ namespace Microsoft.Diagnostics.DataContractReader.Data;
 /// Count - Count of elements
 /// VolatileEntryValue - Offset of the value in the VolatileEntry struct
 /// VolatileEntryNextEntry - Offset of the next entry pointer in the VolatileEntry struct
+/// VolatileEntryHashValue (optional) - Offset of the hash value in the VolatileEntry struct
 /// </summary>
 internal sealed class DacEnumerableHash
 {
@@ -22,21 +23,24 @@ internal sealed class DacEnumerableHash
 
     private readonly Target _target;
     private readonly Target.TypeInfo _type;
+    private readonly uint _bucketCount;
+    private readonly bool _hasHashValues;
 
     public DacEnumerableHash(Target target, TargetPointer address, Target.TypeInfo type)
     {
         // init fields
         _target = target;
         _type = type;
+        _hasHashValues = type.Fields.ContainsKey(nameof(HashedEntry.VolatileEntryHashValue));
 
         Buckets = _target.ReadPointer(address + (ulong)_type.Fields[nameof(Buckets)].Offset);
         Count = _target.Read<uint>(address + (ulong)_type.Fields[nameof(Count)].Offset);
 
         // read items in the hash table
-        uint length = GetLength();
+        _bucketCount = GetLength();
 
         List<TargetPointer> entries = [];
-        for (int i = 0; i < length; i++)
+        for (int i = 0; i < _bucketCount; i++)
         {
             // indexes 0, 1, 2 have special purposes. buckets start at SKIP_SPECIAL_SLOTS
             int bucketOffset = i + SKIP_SPECIAL_SLOTS;
@@ -54,6 +58,42 @@ internal sealed class DacEnumerableHash
     public uint Count { get; init; }
 
     public IReadOnlyList<TargetPointer> Entries { get; init; }
+
+    /// <summary>
+    /// Returns entries whose stored hash value matches the given hash, using bucket-based lookup.
+    /// This reads only the target bucket's chain instead of scanning all entries.
+    /// </summary>
+    public IEnumerable<HashedEntry> FindEntriesByHash(uint hash)
+    {
+        if (!_hasHashValues || _bucketCount == 0)
+            yield break;
+
+        uint bucketIndex = hash % _bucketCount;
+        int bucketOffset = (int)bucketIndex + SKIP_SPECIAL_SLOTS;
+        TargetPointer chainElement = _target.ReadPointer(Buckets + (ulong)(bucketOffset * _target.PointerSize));
+
+        while (!IsEndSentinel(chainElement))
+        {
+            TargetPointer value = chainElement + (ulong)_type.Fields[nameof(VolatileEntry.VolatileEntryValue)].Offset;
+            TargetPointer next = _target.ReadPointer(chainElement + (ulong)_type.Fields[nameof(VolatileEntry.VolatileEntryNextEntry)].Offset);
+            uint entryHash = _target.Read<uint>(chainElement + (ulong)_type.Fields[nameof(HashedEntry.VolatileEntryHashValue)].Offset);
+
+            if (entryHash == hash)
+            {
+                yield return new HashedEntry(value, entryHash);
+            }
+
+            chainElement = next;
+        }
+    }
+
+    public readonly struct HashedEntry(TargetPointer value, uint hashValue)
+    {
+        public TargetPointer Value { get; } = value;
+        public uint HashValue { get; } = hashValue;
+        // Field name must match the datadescriptor field name
+        internal const string VolatileEntryHashValue = nameof(VolatileEntryHashValue);
+    }
 
     internal sealed class VolatileEntry
     {

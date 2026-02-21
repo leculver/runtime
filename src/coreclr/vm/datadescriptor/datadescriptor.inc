@@ -993,6 +993,7 @@ CDAC_TYPE_FIELD(EETypeHashTable, /*pointer*/, Buckets, cdac_data<EETypeHashTable
 CDAC_TYPE_FIELD(EETypeHashTable, /*uint32*/, Count, cdac_data<EETypeHashTable>::Count)
 CDAC_TYPE_FIELD(EETypeHashTable, /*pointer*/, VolatileEntryValue, cdac_data<EETypeHashTable>::VolatileEntryValue)
 CDAC_TYPE_FIELD(EETypeHashTable, /*pointer*/, VolatileEntryNextEntry, cdac_data<EETypeHashTable>::VolatileEntryNextEntry)
+CDAC_TYPE_FIELD(EETypeHashTable, /*uint32*/, VolatileEntryHashValue, cdac_data<EETypeHashTable>::VolatileEntryHashValue)
 CDAC_TYPE_END(EETypeHashTable)
 
 CDAC_TYPE_BEGIN(InstMethodHashTable)

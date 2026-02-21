@@ -10,15 +10,19 @@ internal sealed class EETypeHashTable : IData<EETypeHashTable>
 {
     private const ulong FLAG_MASK = 0x1ul;
 
+    private readonly DacEnumerableHash _baseHashTable;
+    private readonly Target _target;
+
     static EETypeHashTable IData<EETypeHashTable>.Create(Target target, TargetPointer address) => new EETypeHashTable(target, address);
     public EETypeHashTable(Target target, TargetPointer address)
     {
+        _target = target;
         Target.TypeInfo type = target.GetTypeInfo(DataType.EETypeHashTable);
 
-        DacEnumerableHash baseHashTable = new(target, address, type);
+        _baseHashTable = new(target, address, type);
 
         List<Entry> entries = [];
-        foreach (TargetPointer entry in baseHashTable.Entries)
+        foreach (TargetPointer entry in _baseHashTable.Entries)
         {
             TargetPointer typeHandle = target.ReadPointer(entry);
             entries.Add(new(typeHandle));
@@ -27,6 +31,19 @@ internal sealed class EETypeHashTable : IData<EETypeHashTable>
     }
 
     public IReadOnlyList<Entry> Entries { get; init; }
+
+    /// <summary>
+    /// Returns type handle entries whose stored hash value matches the given hash,
+    /// using bucket-based lookup instead of scanning all entries.
+    /// </summary>
+    public IEnumerable<Entry> FindByHash(uint hash)
+    {
+        foreach (DacEnumerableHash.HashedEntry hashedEntry in _baseHashTable.FindEntriesByHash(hash))
+        {
+            TargetPointer typeHandle = _target.ReadPointer(hashedEntry.Value);
+            yield return new Entry(typeHandle);
+        }
+    }
 
     public readonly struct Entry(TargetPointer value)
     {
