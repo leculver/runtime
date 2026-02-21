@@ -896,13 +896,14 @@ static void GetFuncEvalArgValue(DebuggerEval *pDE,
                 _ASSERTE(argTH.GetMethodTable());
 
                 unsigned size = argTH.GetMethodTable()->GetNumInstanceFieldBytes();
-                if (size <= sizeof(ARG_SLOT)
-#if defined(TARGET_AMD64)
-                    // On AMD64 we pass value types of size which are not powers of 2 by ref.
-                    && ((size & (size-1)) == 0)
-#endif // TARGET_AMD64
-                   )
+                if (size <= sizeof(ARG_SLOT))
                 {
+                    // Copy the value type data directly into the ARG_SLOT.
+                    // On AMD64, value types with non-power-of-2 sizes are passed
+                    // by reference per the calling convention. CallTargetWorker
+                    // handles this by taking the address of the ARG_SLOT when
+                    // IsArgPassedByRef() is true, so the data must be here
+                    // rather than behind a pointer to avoid double indirection.
                     memcpyNoGCRefs(ArgSlotEndiannessFixup(pArgument, sizeof(LPVOID)), pAddr, size);
                 }
                 else
@@ -912,10 +913,10 @@ static void GetFuncEvalArgValue(DebuggerEval *pDE,
                     if (ArgIterator::IsArgPassedByRef(argTH))
                     {
                         // On X64, by-value value class arguments which are bigger than 8 bytes are passed by reference
-                        // according to the native calling convention.  The same goes for value class arguments whose size
-                        // is smaller than 8 bytes but not a power of 2.  To avoid side effets, we need to allocate a
-                        // temporary variable and pass that by reference instead. On ARM64, by-value value class
+                        // according to the native calling convention. On ARM64, by-value value class
                         // arguments which are bigger than 16 bytes are passed by reference.
+                        // Value types <= sizeof(ARG_SLOT) are handled above by copying data directly
+                        // into the ARG_SLOT; CallTargetWorker then passes the slot address for by-ref args.
                         _ASSERTE(ppProtectedValueClasses != NULL);
 
                         BYTE * pTemp = new (interopsafe) BYTE[ALIGN_UP(sizeof(ValueClassInfo), 8) + size];
