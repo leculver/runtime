@@ -432,12 +432,62 @@ Contracts used:
 
     public TypeHandle GetTypeHandle(TargetPointer typeHandlePointer)
     {
-        ... // validate that typeHandlePointer points to something that looks like a MethodTable or a TypeDesc.
-        ... // If this is a MethodTable
-        ... //     read Data.MethodTable from typeHandlePointer.
-        ... //     create a MethodTable_1 and add it to _methodTables.
+        // 1. Check low-order bits to determine if this is a MethodTable or a TypeDesc.
+        //    Low bits == 0 means MethodTable; low bits == TypeDesc tag means TypeDesc.
+        //    If neither pattern matches, throw ArgumentException.
+
+        // 2. If already validated and cached in _methodTables, return immediately.
+
+        // 3. If this is a TypeDesc (tagged pointer), return a TypeHandle directly.
+
+        // 4. If the MethodTable data is already in the target's processed data cache,
+        //    it was previously validated -- cache it and return.
+
+        // 5. If this is the FreeObjectMethodTable pointer, trust it without validation.
+
+        // 6. Otherwise, run TypeValidation (see below) on the pointer.
+        //    If validation fails, throw ArgumentException.
+        //    If validation succeeds, read Data.MethodTable, create a MethodTable_1,
+        //    add it to _methodTables, and return.
         return TypeHandle { Address = typeHandlePointer }
     }
+
+    // === TypeValidation ===
+    //
+    // TypeValidation determines whether a given TargetPointer actually points at a valid MethodTable
+    // in the target process. This is important because diagnostic tools may pass arbitrary addresses
+    // (e.g., IP addresses, heap pointers, or corrupted values) that happen to look like MethodTable
+    // pointers.  Without validation, the reader would interpret garbage memory as type metadata.
+    //
+    // Validation has two phases, both wrapped in a try/catch that returns false on any exception
+    // (since reading invalid addresses in the target process may throw):
+    //
+    // Phase 1 - Structural round-trip check (ValidateThrowing):
+    //   Verifies the MethodTable <-> EEClass back-pointer relationship.
+    //
+    //   For non-generic types:
+    //     MethodTable -> EEClass -> MethodTable must round-trip to the original address.
+    //     i.e., ReadPointer(mt.EEClassOrCanonMT).MethodTable == mt.Address
+    //
+    //   For generic instantiations (HasInstantiation or IsArray):
+    //     The EEClass points back to the *canonical* MethodTable, not the instantiated one.
+    //     So we verify one level deeper:
+    //       mt -> EEClass -> CanonicalMT -> EEClass must equal mt -> EEClass
+    //     i.e., the EEClass reached through the canonical MT matches the EEClass we started with.
+    //
+    //   The EEClassOrCanonMT field is a tagged pointer:
+    //     - Low bit 0: direct pointer to EEClass
+    //     - Low bit 1: tagged pointer to canonical MethodTable (untag to dereference)
+    //   For non-canonical MTs, we follow CanonMT -> EEClass to find the EEClass.
+    //
+    // Phase 2 - Ad-hoc sanity checks (ValidateMethodTableAdHoc):
+    //   Additional heuristic checks on MethodTable fields:
+    //     - If the type is not an interface and not System.String:
+    //       BaseSize must be non-zero and aligned to the target's pointer size.
+    //       (Interfaces and String are exempt because their BaseSize may not follow normal rules.)
+    //
+    // If either phase fails or throws, the pointer is considered invalid and GetTypeHandle
+    // will throw an ArgumentException.
 
     public TargetPointer GetModule(TypeHandle TypeHandle)
     {
@@ -1108,13 +1158,67 @@ Method descriptor handles are instantiated by caching the relevant data in a `_m
 ```csharp
     public MethodDescHandle GetMethodDescHandle(TargetPointer methodDescPointer)
     {
-        // Validate that methodDescPointer points at a MethodDesc
-        // Get the corresponding MethodDescChunk pointer
-        // Load the relevant Data.MethodDesc and Data.MethodDescChunk structures
-        // and caching the results in _methodDescs
+        // 1. If already validated and cached in _methodDescs, return immediately.
+
+        // 2. Run MethodValidation (see below) on the pointer.
+        //    If validation fails, throw ArgumentException.
+        //    If validation succeeds, the validator also returns the MethodDescChunk pointer.
+
+        // 3. Load Data.MethodDescChunk and Data.MethodDesc from the validated addresses,
+        //    create a MethodDesc wrapper, cache in _methodDescs, and return.
         return new MethodDescHandle() { Address = methodDescPointer };
     }
 ```
+
+#### MethodValidation
+
+MethodValidation determines whether a `TargetPointer` actually points at a valid `MethodDesc` in the
+target process.  This is critical because diagnostic tools such as the SOS `!U` (unassemble) command
+may pass instruction pointer (IP) addresses where a `MethodDesc` pointer is expected, relying on
+validation to detect the mismatch and return an error rather than interpreting arbitrary memory as a
+method descriptor.
+
+All checks are wrapped in a try/catch that returns `false` on any exception, since reading invalid
+target addresses may throw.
+
+The validation performs these checks in order:
+
+1. **MethodDescChunk navigation**: Compute the containing `MethodDescChunk` address from the
+   candidate pointer.  Each `MethodDesc` stores a `ChunkIndex` indicating its offset (in multiples
+   of `MethodDescAlignment`) from the end of the `MethodDescChunk` header.  The chunk address is:
+   ```
+   chunkAddress = methodDescPointer - sizeof(MethodDescChunk) - (ChunkIndex * MethodDescAlignment)
+   ```
+   If reading the `MethodDesc` or `MethodDescChunk` data at the computed addresses throws, the
+   pointer is invalid.
+
+2. **MethodTable pointer sanity**: The `MethodDescChunk` contains a `MethodTable` pointer.  Reject
+   if it is `Null`, `MaxValue(64-bit)`, or `MaxValue(32-bit)` -- these sentinel values indicate
+   garbage data.
+
+3. **VTable slot consistency**: If the `MethodDesc` does *not* have a non-vtable slot
+   (`HasNonVtableSlot == false`), verify that the `MethodDesc`'s `Slot` index is within the vtable
+   range of its `MethodTable`.  This catches cases where the slot number is nonsensical for the
+   supposed owning type.
+
+4. **Temporary entry point round-trip**: If the `MethodDesc` has a temporary entry point assigned
+   (a precode stub used before JIT compilation), resolve the precode back to its owning
+   `MethodDesc` via the `PrecodeStubs` contract:
+   ```
+   precodeStubs.GetMethodDescFromStubAddress(temporaryEntryPoint) == methodDescPointer
+   ```
+   If the round-trip fails, the pointer is not a valid `MethodDesc`.
+
+5. **JIT code block round-trip**: If the `MethodDesc` has native (JIT-compiled) code and is not an
+   FCall (a runtime-internal fast call), look up the code block through the `ExecutionManager`
+   contract and verify the reverse mapping:
+   ```
+   codeBlock = executionManager.GetCodeBlockHandle(jitCodeAddr)
+   executionManager.GetMethodDesc(codeBlock) == methodDescPointer
+   ```
+   This confirms that the JIT's bookkeeping agrees that this code belongs to this `MethodDesc`.
+
+If all checks pass, the pointer is considered valid.
 
 And the various apis are implemented with the following algorithms
 
