@@ -48,6 +48,9 @@ namespace System.Diagnostics.Tracing
         private PollingCounter? _ilBytesJittedCounter;
         private PollingCounter? _methodsJittedCounter;
         private IncrementingPollingCounter? _jitTimeCounter;
+        private PollingCounter? _pinnedObjectsCounter;
+        private PollingCounter? _gcPromotedBytesCounter;
+        private PollingCounter? _finalizationPendingCounter;
 
         private enum EventId : int
         {
@@ -108,6 +111,9 @@ namespace System.Diagnostics.Tracing
                 _ilBytesJittedCounter ??= new PollingCounter("il-bytes-jitted", this, () => Runtime.JitInfo.GetCompiledILBytes()) { DisplayName = "IL Bytes Jitted", DisplayUnits = "B" };
                 _methodsJittedCounter ??= new PollingCounter("methods-jitted-count", this, () => Runtime.JitInfo.GetCompiledMethodCount()) { DisplayName = "Number of Methods Jitted" };
                 _jitTimeCounter ??= new IncrementingPollingCounter("time-in-jit", this, () => Runtime.JitInfo.GetCompilationTime().TotalMilliseconds) { DisplayName = "Time spent in JIT", DisplayUnits = "ms", DisplayRateTimeScale = new TimeSpan(0, 0, 1) };
+                _pinnedObjectsCounter ??= new PollingCounter("pinned-objects-count", this, () => GC.GetGCMemoryInfo().PinnedObjectsCount) { DisplayName = "Number of Pinned Objects" };
+                _gcPromotedBytesCounter ??= new PollingCounter("gc-promoted-bytes", this, () => GC.GetGCMemoryInfo().PromotedBytes) { DisplayName = "GC Promoted Bytes", DisplayUnits = "B" };
+                _finalizationPendingCounter ??= new PollingCounter("gc-finalization-pending-count", this, () => GC.GetGCMemoryInfo().FinalizationPendingCount) { DisplayName = "GC Finalization Pending Count" };
 
                 AppContext.LogSwitchValues(this);
                 ProcessorCount(Environment.ProcessorCount);
