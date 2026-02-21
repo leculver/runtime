@@ -2912,10 +2912,9 @@ void ClassLoader::NotifyUnload(MethodTable* pMT, bool unloadStarted)
     {
         BEGIN_PROFILER_CALLBACK(CORProfilerTrackClasses());
         {
-            if (pMT->ContainsGenericVariables() || pMT->IsArray())
+            if (pMT->ContainsGenericVariables())
             {
-                // Don't notify the profiler about types with unbound variables or arrays.
-                // See ClassLoadStarted callback for more details.
+                // Don't notify the profiler about types with unbound variables.
                 return;
             }
 
