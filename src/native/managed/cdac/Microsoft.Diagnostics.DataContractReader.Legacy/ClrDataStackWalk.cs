@@ -20,6 +20,7 @@ public sealed unsafe partial class ClrDataStackWalk : IXCLRDataStackWalk
     private readonly IXCLRDataStackWalk? _legacyImpl;
 
     private bool _currentFrameIsValid;
+    private bool _isFirstFrame;
     private readonly IEnumerator<IStackDataFrameHandle> _dataFrames;
 
     public ClrDataStackWalk(TargetPointer threadAddr, uint flags, Target target, IXCLRDataStackWalk? legacyImpl)
@@ -35,6 +36,7 @@ public sealed unsafe partial class ClrDataStackWalk : IXCLRDataStackWalk
         // IEnumerator<T> begins before the first element.
         // Call MoveNext() to set _dataFrames.Current to the first element.
         _currentFrameIsValid = _dataFrames.MoveNext();
+        _isFirstFrame = _currentFrameIsValid;
     }
 
     int IXCLRDataStackWalk.GetContext(uint contextFlags, uint contextBufSize, uint* contextSize, [MarshalUsing(CountElementName = "contextBufSize"), Out] byte[] contextBuf)
@@ -121,6 +123,7 @@ public sealed unsafe partial class ClrDataStackWalk : IXCLRDataStackWalk
         try
         {
             _currentFrameIsValid = _dataFrames.MoveNext();
+            _isFirstFrame = false;
             hr = _currentFrameIsValid ? HResults.S_OK : HResults.S_FALSE;
         }
         catch (System.Exception ex)
@@ -140,12 +143,36 @@ public sealed unsafe partial class ClrDataStackWalk : IXCLRDataStackWalk
     }
     int IXCLRDataStackWalk.Request(uint reqCode, uint inBufferSize, byte* inBuffer, uint outBufferSize, byte* outBuffer)
     {
+        const uint CLRDATA_REQUEST_REVISION = 0xe0000000;
+        const uint CLRDATA_STACK_WALK_REQUEST_SET_FIRST_FRAME = 0xe1000000;
         const uint DACSTACKPRIV_REQUEST_FRAME_DATA = 0xf0000000;
 
         int hr = HResults.S_OK;
 
         switch (reqCode)
         {
+            case CLRDATA_REQUEST_REVISION:
+                if (inBufferSize != 0 || inBuffer != null || outBufferSize != sizeof(uint))
+                {
+                    hr = HResults.E_INVALIDARG;
+                }
+                else
+                {
+                    *(uint*)outBuffer = 1;
+                }
+                break;
+
+            case CLRDATA_STACK_WALK_REQUEST_SET_FIRST_FRAME:
+                if (inBufferSize != sizeof(uint) || outBufferSize != 0)
+                {
+                    hr = HResults.E_INVALIDARG;
+                }
+                else
+                {
+                    _isFirstFrame = *(uint*)inBuffer != 0;
+                }
+                break;
+
             case DACSTACKPRIV_REQUEST_FRAME_DATA:
                 if (outBufferSize < sizeof(ulong))
                     hr = HResults.E_INVALIDARG;
