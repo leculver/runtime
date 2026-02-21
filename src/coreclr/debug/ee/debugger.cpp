@@ -5415,6 +5415,15 @@ bool Debugger::FirstChanceNativeException(EXCEPTION_RECORD *exception,
     CONTRACTL_END;
 
 
+    // If the EE is shutting down, the debugger should not try to manage exceptions.
+    // Attempting to acquire the debugger lock during shutdown will park this thread
+    // forever (see CrstBase::ReleaseAndBlockForShutdownIfNotSpecialThread), causing
+    // a deadlock. Just let the exception flow through without debugger intervention.
+    if (g_fEEShutDown & ShutDown_Start)
+    {
+        return false;
+    }
+
     // Ignore any notification exceptions sent from code:Debugger.SendRawEvent.
     // This is not a common case, but could happen in some cases described
     // in SendRawEvent. Either way, Left-Side and VM should just ignore these.
