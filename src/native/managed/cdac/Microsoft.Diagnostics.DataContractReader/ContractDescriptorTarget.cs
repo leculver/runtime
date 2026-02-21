@@ -255,6 +255,7 @@ public sealed unsafe class ContractDescriptorTarget : Target
     {
         if (!TryReadContractDescriptor(address, dataTargetDelegates, out Descriptor mainDescriptor))
         {
+            Trace.TraceError($"[cDAC] Failed to read main contract descriptor at 0x{address:x}.");
             descriptors = [];
             return false;
         }
@@ -295,18 +296,27 @@ public sealed unsafe class ContractDescriptorTarget : Target
         // Magic - uint64_t
         Span<byte> buffer = stackalloc byte[sizeof(ulong)];
         if (dataTargetDelegates.ReadFromTarget(address, buffer) < 0)
+        {
+            Trace.TraceError($"[cDAC] Failed to read contract descriptor magic at 0x{address:x}.");
             return false;
+        }
 
         address += sizeof(ulong);
         ReadOnlySpan<byte> magicLE = "DNCCDAC\0"u8;
         ReadOnlySpan<byte> magicBE = "\0CADCCND"u8;
         bool isLittleEndian = buffer.SequenceEqual(magicLE);
         if (!isLittleEndian && !buffer.SequenceEqual(magicBE))
+        {
+            Trace.TraceError($"[cDAC] Invalid contract descriptor magic at 0x{address - sizeof(ulong):x}.");
             return false;
+        }
 
         // Flags - uint32_t
         if (!TryRead(address, isLittleEndian, dataTargetDelegates, out uint flags))
+        {
+            Trace.TraceError($"[cDAC] Failed to read contract descriptor flags at 0x{address:x}.");
             return false;
+        }
 
         address += sizeof(uint);
 
@@ -317,19 +327,28 @@ public sealed unsafe class ContractDescriptorTarget : Target
 
         // Descriptor size - uint32_t
         if (!TryRead(address, config.IsLittleEndian, dataTargetDelegates, out uint descriptorSize))
+        {
+            Trace.TraceError($"[cDAC] Failed to read descriptor size at 0x{address:x}.");
             return false;
+        }
 
         address += sizeof(uint);
 
         // Descriptor - char*
         if (!TryReadPointer(address, config, dataTargetDelegates, out TargetPointer descriptorAddr))
+        {
+            Trace.TraceError($"[cDAC] Failed to read descriptor pointer at 0x{address:x}.");
             return false;
+        }
 
         address += (uint)pointerSize;
 
         // Pointer data count - uint32_t
         if (!TryRead(address, config.IsLittleEndian, dataTargetDelegates, out uint pointerDataCount))
+        {
+            Trace.TraceError($"[cDAC] Failed to read pointer data count at 0x{address:x}.");
             return false;
+        }
 
         address += sizeof(uint);
 
@@ -338,25 +357,37 @@ public sealed unsafe class ContractDescriptorTarget : Target
 
         // Pointer data - uintptr_t*
         if (!TryReadPointer(address, config, dataTargetDelegates, out TargetPointer pointerDataAddr))
+        {
+            Trace.TraceError($"[cDAC] Failed to read pointer data address at 0x{address:x}.");
             return false;
+        }
 
         // Read descriptor
         Span<byte> descriptorBuffer = descriptorSize <= StackAllocByteThreshold
             ? stackalloc byte[(int)descriptorSize]
             : new byte[(int)descriptorSize];
         if (dataTargetDelegates.ReadFromTarget(descriptorAddr.Value, descriptorBuffer) < 0)
+        {
+            Trace.TraceError($"[cDAC] Failed to read descriptor data ({descriptorSize} bytes) at 0x{descriptorAddr.Value:x}.");
             return false;
+        }
 
         ContractDescriptorParser.ContractDescriptor? contractDescriptor = ContractDescriptorParser.ParseCompact(descriptorBuffer);
         if (contractDescriptor is null)
+        {
+            Trace.TraceError($"[cDAC] Failed to parse contract descriptor ({descriptorSize} bytes) at 0x{descriptorAddr.Value:x}.");
             return false;
+        }
 
         // Read pointer data
         TargetPointer[] pointerData = new TargetPointer[pointerDataCount];
         for (int i = 0; i < pointerDataCount; i++)
         {
             if (!TryReadPointer(pointerDataAddr.Value + (uint)(i * pointerSize), config, dataTargetDelegates, out pointerData[i]))
+            {
+                Trace.TraceError($"[cDAC] Failed to read pointer data[{i}] at 0x{pointerDataAddr.Value + (uint)(i * pointerSize):x}.");
                 return false;
+            }
         }
 
         descriptor = new Descriptor

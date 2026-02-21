@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using Microsoft.Diagnostics.DataContractReader.Legacy;
@@ -47,7 +48,10 @@ internal static class Entrypoints
             },
             [],
             out ContractDescriptorTarget? target))
+        {
+            Trace.TraceError("[cDAC] cdac_reader_init: failed to create ContractDescriptorTarget.");
             return -1;
+        }
 
         GCHandle gcHandle = GCHandle.Alloc(target);
         *handle = GCHandle.ToIntPtr(gcHandle);
@@ -75,7 +79,10 @@ internal static class Entrypoints
         ComWrappers cw = new StrategyBasedComWrappers();
         Target? target = GCHandle.FromIntPtr(handle).Target as Target;
         if (target == null)
+        {
+            Trace.TraceError("[cDAC] cdac_reader_create_sos_interface: invalid handle -- target is null.");
             return -1;
+        }
 
         object? legacyImpl = legacyImplPtr != IntPtr.Zero
             ? cw.GetOrCreateObjectForComInstance(legacyImplPtr, CreateObjectFlags.None)
@@ -151,6 +158,7 @@ internal static class Entrypoints
             [],
             out ContractDescriptorTarget? target))
         {
+            Trace.TraceError($"[cDAC] CLRDataCreateInstance: failed to create ContractDescriptorTarget from address 0x{contractAddress:x}.");
             return -1;
         }
 
