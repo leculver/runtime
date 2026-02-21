@@ -13104,6 +13104,12 @@ static CorJitResult invokeCompileMethod(EECodeGenManager *jitMgr,
     if (g_pConfig->JitFramed())
         flags.Set(CORJIT_FLAGS::CORJIT_FLAG_FRAMED);
 
+    // Force frame pointers when PerfMap is enabled so native profilers (e.g., Linux perf)
+    // can walk the stack via frame pointer chains. Without this, x64 methods may omit
+    // frame pointers, producing broken/detached flamegraph frames.
+    if (PerfMap::IsEnabled())
+        flags.Set(CORJIT_FLAGS::CORJIT_FLAG_FRAMED);
+
     // Set flags based on method's ImplFlags.
     if (!ftn->IsNoMetadata())
     {

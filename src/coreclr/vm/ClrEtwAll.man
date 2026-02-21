@@ -2299,6 +2299,27 @@
                         </UserData>
                     </template>
 
+                    <template tid="R2RGetEntryPoint_V1">
+                        <data name="MethodID" inType="win:UInt64" outType="win:HexInt64" />
+                        <data name="MethodNamespace" inType="win:UnicodeString" />
+                        <data name="MethodName" inType="win:UnicodeString" />
+                        <data name="MethodSignature" inType="win:UnicodeString" />
+                        <data name="EntryPoint" inType="win:UInt64" outType="win:HexInt64" />
+                        <data name="ClrInstanceID" inType="win:UInt16" />
+                        <data name="MethodSize" inType="win:UInt32" outType="win:HexInt32" />
+                        <UserData>
+                            <R2RGetEntryPoint_V1 xmlns="myNs">
+                                <MethodID> %1 </MethodID>
+                                <MethodNamespace> %2 </MethodNamespace>
+                                <MethodName> %3 </MethodName>
+                                <MethodSignature> %4 </MethodSignature>
+                                <EntryPoint> %5 </EntryPoint>
+                                <ClrInstanceID> %6 </ClrInstanceID>
+                                <MethodSize> %7 </MethodSize>
+                            </R2RGetEntryPoint_V1>
+                        </UserData>
+                    </template>
+
                     <template tid="R2RGetEntryPointStart">
                         <data name="MethodID" inType="win:UInt64" outType="win:HexInt64" />
                         <data name="ClrInstanceID" inType="win:UInt16" />
@@ -3891,6 +3912,11 @@
                            keywords ="CompilationDiagnosticKeyword" opcode="MethodLoad"
                            task="CLRMethod"
                            symbol="R2RGetEntryPoint" message="$(string.RuntimePublisher.R2RGetEntryPointEventMessage)"/>
+
+                    <event value="159" version="1" level="win:Informational" template="R2RGetEntryPoint_V1"
+                           keywords ="CompilationDiagnosticKeyword" opcode="MethodLoad"
+                           task="CLRMethod"
+                           symbol="R2RGetEntryPoint_V1" message="$(string.RuntimePublisher.R2RGetEntryPoint_V1EventMessage)"/>
 
                     <event value="160" version="0" level="win:Informational" template="R2RGetEntryPointStart"
                            keywords ="CompilationDiagnosticKeyword" opcode="MethodLoad"
@@ -8653,6 +8679,7 @@
                 <string id="RuntimePublisher.MethodLoad_V1EventMessage" value="MethodID=%1;%nModuleID=%2;%nMethodStartAddress=%3;%nMethodSize=%4;%nMethodToken=%5;%nMethodFlags=%6;%nClrInstanceID=%7" />
                 <string id="RuntimePublisher.MethodLoad_V2EventMessage" value="MethodID=%1;%nModuleID=%2;%nMethodStartAddress=%3;%nMethodSize=%4;%nMethodToken=%5;%nMethodFlags=%6;%nClrInstanceID=%7;%nReJITID=%8" />
                 <string id="RuntimePublisher.R2RGetEntryPointEventMessage" value="MethodID=%1;%nMethodName=%2;%nEntryPoint=%3;%nClrInstanceID=%4" />
+                <string id="RuntimePublisher.R2RGetEntryPoint_V1EventMessage" value="MethodID=%1;%nMethodName=%2;%nEntryPoint=%3;%nClrInstanceID=%4;%nMethodSize=%5" />
                 <string id="RuntimePublisher.R2RGetEntryPointStartEventMessage" value="MethodID=%1;%nClrInstanceID=%2" />
                 <string id="RuntimePublisher.MethodLoadVerboseEventMessage" value="MethodID=%1;%nModuleID=%2;%nMethodStartAddress=%3;%nMethodSize=%4;%nMethodToken=%5;%nMethodFlags=%6;%nMethodNamespace=%7;%nMethodName=%8;%nMethodSignature=%9" />
                 <string id="RuntimePublisher.MethodLoadVerbose_V1EventMessage" value="MethodID=%1;%nModuleID=%2;%nMethodStartAddress=%3;%nMethodSize=%4;%nMethodToken=%5;%nMethodFlags=%6;%nMethodNamespace=%7;%nMethodName=%8;%nMethodSignature=%9;%nClrInstanceID=%10" />

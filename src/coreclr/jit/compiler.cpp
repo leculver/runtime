@@ -3797,14 +3797,18 @@ _SetMinOpts:
             codeGen->setFrameRequired(true);
         }
 
-#if !defined(TARGET_AMD64)
-        // The VM sets JitFlags::JIT_FLAG_FRAMED for two reasons: (1) the DOTNET_JitFramed variable is set, or
-        // (2) the function is marked "noinline". The reason for #2 is that people mark functions
-        // noinline to ensure the show up on in a stack walk. But for AMD64, we don't need a frame
-        // pointer for the frame to show up in stack walk.
+        // The VM sets JitFlags::JIT_FLAG_FRAMED for several reasons:
+        // (1) DOTNET_JitFramed is set,
+        // (2) the method is marked "noinline" (people mark functions noinline to ensure they show
+        //     up in a stack walk),
+        // (3) PerfMap is enabled and frame pointers are needed for native profilers.
+        //
+        // On AMD64, managed stack walking doesn't need a frame pointer (unwind info is sufficient),
+        // but native profilers like Linux perf rely on frame pointers for stack unwinding at high
+        // sampling rates. Respect JIT_FLAG_FRAMED on all platforms so that DOTNET_JitFramed=1 and
+        // PerfMap-triggered framing work correctly on x64.
         if (opts.jitFlags->IsSet(JitFlags::JIT_FLAG_FRAMED))
             codeGen->setFrameRequired(true);
-#endif
 
         if (opts.OptimizationDisabled() || IsReadyToRun())
         {

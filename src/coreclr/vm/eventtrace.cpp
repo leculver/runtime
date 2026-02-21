@@ -3402,7 +3402,7 @@ VOID ETW::MethodLog::GetR2RGetEntryPoint(MethodDesc *pMethodDesc, PCODE pEntryPo
         GC_TRIGGERS;
     } CONTRACTL_END;
 
-    if (ETW_EVENT_ENABLED(MICROSOFT_WINDOWS_DOTNETRUNTIME_PROVIDER_DOTNET_Context, R2RGetEntryPoint))
+    if (ETW_EVENT_ENABLED(MICROSOFT_WINDOWS_DOTNETRUNTIME_PROVIDER_DOTNET_Context, R2RGetEntryPoint_V1))
     {
         EX_TRY
         {
@@ -3411,13 +3411,26 @@ VOID ETW::MethodLog::GetR2RGetEntryPoint(MethodDesc *pMethodDesc, PCODE pEntryPo
                 SString tNamespace, tMethodName, tMethodSignature;
                 pMethodDesc->GetMethodInfo(tNamespace, tMethodName, tMethodSignature);
 
-                FireEtwR2RGetEntryPoint(
+                ULONG ulMethodSize = 0;
+                if (pEntryPoint != (PCODE)0)
+                {
+                    EECodeInfo codeInfo(pEntryPoint);
+                    if (codeInfo.IsValid())
+                    {
+                        IJitManager::MethodRegionInfo methodRegionInfo;
+                        codeInfo.GetMethodRegionInfo(&methodRegionInfo);
+                        ulMethodSize = (ULONG)methodRegionInfo.hotSize;
+                    }
+                }
+
+                FireEtwR2RGetEntryPoint_V1(
                     (UINT64)pMethodDesc,
                     (PCWSTR)tNamespace.GetUnicode(),
                     (PCWSTR)tMethodName.GetUnicode(),
                     (PCWSTR)tMethodSignature.GetUnicode(),
                     pEntryPoint,
-                    GetClrInstanceId());
+                    GetClrInstanceId(),
+                    ulMethodSize);
 
         } EX_CATCH{ } EX_END_CATCH
     }
