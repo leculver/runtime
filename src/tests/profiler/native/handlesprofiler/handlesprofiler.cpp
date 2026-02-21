@@ -83,6 +83,8 @@ HRESULT HandlesProfiler::GarbageCollectionStarted(int cGenerations, BOOL generat
 
 HRESULT HandlesProfiler::ObjectAllocated(ObjectID objectId, ClassID classId)
 {
+    SHUTDOWNGUARD();
+
     // Create handles for TestClassForWeakHandle, TestClassForStrongHandle and TestClassForPinnedHandle instances
     String typeName = GetClassIDName(classId);
 
