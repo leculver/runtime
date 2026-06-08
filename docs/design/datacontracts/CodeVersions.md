@@ -75,7 +75,7 @@ Data descriptors used:
 | NativeCodeVersionNode | MethodDesc | indicates a synthetic native code version node |
 | NativeCodeVersionNode | NativeCode | indicates an explicit native code version node |
 | NativeCodeVersionNode | Flags | `NativeCodeVersionNodeFlags` flags, see below |
-| NativeCodeVersionNode | VersionId | Version ID corresponding to the parent IL code version |
+| NativeCodeVersionNode | ILVersionId | Version ID corresponding to the parent IL code version |
 | NativeCodeVersionNode | GCCoverageInfo | GCStress debug info, if supported |
 | NativeCodeVersionNode | OptimizationTier | The optimization tier of this native code version |
 | ILCodeVersioningState | FirstVersionNode | pointer to the first `ILCodeVersionNode` |

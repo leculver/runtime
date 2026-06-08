@@ -1,8 +1,8 @@
 # Contract GCInfo
 
-This contract is for fetching information related to GCInfo associated with native code. Currently, this contract does not support x86 architecture.
+This contract is for fetching information related to GCInfo associated with native code. The cDAC GCInfo contract is registered for AMD64, ARM64, ARM, LoongArch64, and RISCV64 target architectures. x86 uses a separate legacy GCInfo decoding path and is not served by this contract's shared platform-specific decoder.
 
-The GCInfo contract has platform specific implementations as GCInfo differs per architecture. With the exception of x86, all platforms have a common encoding scheme with different encoding lengths and normalization functions for data. x86 uses an entirely different scheme which is not currently supported by this contract.
+The GCInfo contract has platform specific implementations as GCInfo differs per architecture. With the exception of x86, all supported target architectures have a common encoding scheme with different encoding lengths and normalization functions for data. x86 uses an entirely different scheme handled by the x86 stack-walk decoder. The contract also exposes `DecodeInterpreterGCInfo`, which decodes interpreter-formatted GCInfo through the registered architecture's contract instance.
 
 ## APIs of contract
 
@@ -275,9 +275,17 @@ Slots use delta encoding where consecutive entries encode only the difference fr
 | **Stack Slot** | `offset >> 2` | `offset << 2` |
 | **Stack Area Size** | `size >> 2` | `size << 2` |
 
-#### Interpreter (WASM / FEATURE_INTERPRETER)
+#### LoongArch64
 
-The interpreter uses a platform-independent encoding where all normalization and denormalization functions are identity (no transformation). This encoding is used for WASM targets (where `TargetGcInfoEncoding` is `InterpreterGcInfoEncoding`) and on any architecture when `FEATURE_INTERPRETER` is enabled.
+LoongArch64 uses the shared GCInfo encoding with LoongArch64-specific trait constants and normalization rules in the cDAC reader.
+
+#### RISCV64
+
+RISCV64 uses the shared GCInfo encoding with RISCV64-specific trait constants and normalization rules in the cDAC reader.
+
+#### Interpreter (FEATURE_INTERPRETER)
+
+The interpreter uses a platform-independent encoding where all normalization and denormalization functions are identity (no transformation). This encoding is used by interpreter GCInfo and is decoded through `DecodeInterpreterGCInfo` on an already-registered GCInfo contract.
 
 | Encoding Base | Value | Purpose |
 | --- | --- | --- |

@@ -157,7 +157,7 @@ enum ClrModifiableAssemblies : uint
 | `Module` | `Assembly` | Assembly of the Module |
 | `Module` | `PEAssembly` | PEAssembly of the Module |
 | `Module` | `Base` | Pointer to start of PE file in memory |
-| `Module` | `Flags` | Assembly of the Module |
+| `Module` | `Flags` | Module flags |
 | `Module` | `LoaderAllocator` | LoaderAllocator of the Module |
 | `Module` | `Path` | Path of the Module (UTF-16, null-terminated) |
 | `Module` | `FileName` | File name of the Module (UTF-16, null-terminated) |

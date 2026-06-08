@@ -81,6 +81,9 @@ Global variables used:
 | StressLogChunkSize | uint | Size of a stress log chunk |
 | StressLogMaxMessageSize | ulong | Maximum size of a stress log message |
 | StressLogHasModuleTable | byte | Whether the stress log module table is present |
+| StressLogModuleTable | pointer | Optional pointer to the stress log module table; when absent, the reader falls back to the `StressLog.Modules` field |
+| StressLogMaxModules | ulong | Number of module table entries available to scan; readers should still bound and validate dump-derived table walks |
+| StressLogValidChunkSig | uint | Expected signature value for stress log chunks; matching this value is one validity heuristic, not proof that the surrounding dump data is well-formed |
 
 ```csharp
 bool HasStressLog()
@@ -227,7 +230,7 @@ protected TargetPointer GetFormatPointer(ulong formatOffset)
         moduleTable = stressLog.Modules ?? throw new InvalidOperationException("StressLogModuleTable is not set and StressLog does not contain a ModuleTable offset, but StressLogHasModuleTable is set to 1.");
     }
     uint moduleEntrySize = target.GetTypeInfo(DataType.StressLogModuleDesc).Size!.Value;
-    uint maxModules = target.ReadGlobal<uint>("StressLogMaxModules");
+    ulong maxModules = target.ReadGlobal<ulong>("StressLogMaxModules");
     for (uint i = 0; i < maxModules; ++i)
     {
         StressLogModuleDesc module = new(Target, moduleTable.Value + i * moduleEntrySize);

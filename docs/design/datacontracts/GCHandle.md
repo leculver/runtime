@@ -1,6 +1,6 @@
 # Contract GCHandle
 
-This contract allows decoding and reading of GCHandles. This will also include handle enumeration in the future
+This contract allows decoding and reading a single GC handle value. Handle table enumeration is currently provided by the GC contract rather than this standalone GCHandle contract.
 
 ## Data structures defined by contract
 ``` csharp

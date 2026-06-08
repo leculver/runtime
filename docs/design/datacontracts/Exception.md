@@ -50,6 +50,8 @@ Data descriptors used:
 | `StackTraceElement` | `MethodDesc` | nuint | Pointer to the frame method's `MethodDesc` |
 | `StackTraceElement` | `Flags` | int32 | `StackTraceElementFlags` bitmask (see Contract Constants below) |
 
+The `ExceptionInfo` descriptor also contains fields consumed by other contracts, including stack bounds, pass number, EH clause data, handler PC ranges, and the optional Windows-only `ExceptionWatsonBucketTrackerBuckets` field. Those fields are intentionally documented with the consuming StackWalk and Thread contract behavior rather than as Exception contract inputs.
+
 Contracts used:
 | Contract Name | Purpose |
 | --- | --- |

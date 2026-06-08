@@ -60,7 +60,6 @@ Global variables used:
 | Global Name | Type | Purpose |
 | --- | --- | --- |
 | `ArrayBoundsZero` | TargetPointer | Known value for single dimensional, zero-lower-bound array |
-| `ObjectHeaderSize` | uint32 | Size of the object header (sync block and alignment) |
 | `ObjectToMethodTableUnmask` | uint8 | Bits to clear for converting to a method table address |
 | `StringMethodTable` | TargetPointer | The method table for System.String |
 | `SyncTableEntries` | TargetPointer | The `SyncTableEntry` list |
@@ -129,8 +128,8 @@ TargetPointer GetArrayData(TargetPointer address, out uint count, out TargetPoin
         lowerBounds = target.ReadGlobalPointer("ArrayBoundsZero");
     }
 
-    // Sync block is before `this` pointer, so substract the object header size
-    ulong dataOffset = typeSystemContract.GetBaseSize(typeHandle) - target.ReadGlobal<uint>("ObjectHeaderSize");
+    // Sync block is before `this` pointer, so subtract the ObjectHeader data descriptor size
+    ulong dataOffset = typeSystemContract.GetBaseSize(typeHandle) - target.GetTypeInfo(DataType.ObjectHeader).Size.Value;
     return address + dataOffset;
 }
 
@@ -152,7 +151,7 @@ bool GetBuiltInComData(TargetPointer address, out TargetPointer rcw, out TargetP
 int TryGetHashCode(TargetPointer address)
 {
     // Read the sync block value from the ObjectHeader preceding the object
-    uint syncBlockValue = target.Read<uint>(address - /* ObjectHeader size */ + /* ObjectHeader::SyncBlockValue offset */);
+    uint syncBlockValue = target.Read<uint>(address - /* ObjectHeader data descriptor size */ + /* ObjectHeader::SyncBlockValue offset */);
 
     if ((syncBlockValue & target.ReadGlobal<uint>("SyncBlockIsHashOrSyncBlockIndex")) == 0)
         return 0;
