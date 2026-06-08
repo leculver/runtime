@@ -185,6 +185,9 @@ internal sealed class MockSyncBlockBuilder
         return syncBlock;
     }
 
+    internal MockSyncBlock AddSyncBlock()
+        => AddSyncBlock(0, 0, 0, hasInteropInfo: false);
+
     /// <summary>
     /// Prepends a new SyncBlock to the cleanup list.
     /// </summary>

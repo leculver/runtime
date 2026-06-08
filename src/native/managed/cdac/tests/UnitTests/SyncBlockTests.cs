@@ -122,6 +122,90 @@ public class SyncBlockTests
 
     [Theory]
     [ClassData(typeof(MockTarget.StdArch))]
+    public void GetAdditionalThreadCount_NoAdditionalThreads_ReturnsZero(MockTarget.Architecture arch)
+    {
+        TargetPointer syncBlockAddress = TargetPointer.Null;
+        ISyncBlock contract = CreateSyncBlockContract(arch, syncBlock =>
+        {
+            syncBlockAddress = syncBlock.AddSyncBlockToCleanupList(
+                TargetPointer.Null,
+                TargetPointer.Null,
+                TargetPointer.Null).Address;
+        });
+
+        uint count = contract.GetAdditionalThreadCount(syncBlockAddress);
+
+        Assert.Equal(0u, count);
+    }
+
+    [Theory]
+    [ClassData(typeof(MockTarget.StdArch))]
+    public void GetAdditionalThreadCount_CountsLinkNextChain(MockTarget.Architecture arch)
+    {
+        TargetPointer head = TargetPointer.Null;
+        ISyncBlock contract = CreateSyncBlockContract(arch, syncBlock =>
+        {
+            TargetPointer tail = syncBlock.AddSyncBlockToCleanupList(
+                TargetPointer.Null,
+                TargetPointer.Null,
+                TargetPointer.Null).Address;
+            TargetPointer middle = syncBlock.AddSyncBlockToCleanupList(
+                TargetPointer.Null,
+                TargetPointer.Null,
+                TargetPointer.Null).Address;
+            head = syncBlock.AddSyncBlockToCleanupList(
+                TargetPointer.Null,
+                TargetPointer.Null,
+                TargetPointer.Null).Address;
+            Assert.NotEqual(TargetPointer.Null, tail);
+            Assert.NotEqual(TargetPointer.Null, middle);
+        });
+
+        uint count = contract.GetAdditionalThreadCount(head);
+
+        Assert.Equal(2u, count);
+    }
+
+    [Theory]
+    [ClassData(typeof(MockTarget.StdArch))]
+    public void GetAdditionalThreadCount_CapsAtNativeLimit(MockTarget.Architecture arch)
+    {
+        TargetPointer head = TargetPointer.Null;
+        ISyncBlock contract = CreateSyncBlockContract(arch, syncBlock =>
+        {
+            for (int i = 0; i < 1002; i++)
+            {
+                head = syncBlock.AddSyncBlockToCleanupList(
+                    TargetPointer.Null,
+                    TargetPointer.Null,
+                    TargetPointer.Null).Address;
+            }
+        });
+
+        uint count = contract.GetAdditionalThreadCount(head);
+
+        Assert.Equal(1000u, count);
+    }
+
+    [Theory]
+    [ClassData(typeof(MockTarget.StdArch))]
+    public void GetAdditionalThreadCount_CapsSelfCycle(MockTarget.Architecture arch)
+    {
+        TargetPointer syncBlockAddress = TargetPointer.Null;
+        ISyncBlock contract = CreateSyncBlockContract(arch, syncBlock =>
+        {
+            MockSyncBlock block = syncBlock.AddSyncBlock();
+            block.LinkNext = block.Address;
+            syncBlockAddress = block.Address;
+        });
+
+        uint count = contract.GetAdditionalThreadCount(syncBlockAddress);
+
+        Assert.Equal(1000u, count);
+    }
+
+    [Theory]
+    [ClassData(typeof(MockTarget.StdArch))]
     public void GetBuiltInComData_NoInteropInfo(MockTarget.Architecture arch)
     {
         TargetPointer syncBlockAddress = TargetPointer.Null;

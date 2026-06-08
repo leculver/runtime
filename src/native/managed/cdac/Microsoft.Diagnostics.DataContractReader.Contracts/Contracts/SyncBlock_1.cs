@@ -5,6 +5,8 @@ namespace Microsoft.Diagnostics.DataContractReader.Contracts;
 
 internal readonly struct SyncBlock_1 : ISyncBlock
 {
+    private const uint MaxAdditionalThreadCount = 1000;
+
     private readonly Target _target;
     private readonly TargetPointer _syncTableEntries;
 
@@ -76,8 +78,18 @@ internal readonly struct SyncBlock_1 : ISyncBlock
 
     public uint GetAdditionalThreadCount(TargetPointer syncBlock)
     {
-        // TODO: read conditional weak table to get additional thread count
-        return 0;
+        uint count = 0;
+        TargetPointer next = GetNextSyncBlock(syncBlock);
+        while (next != TargetPointer.Null && count < MaxAdditionalThreadCount)
+        {
+            count++;
+            if (count == MaxAdditionalThreadCount)
+                break;
+
+            next = GetNextSyncBlock(next);
+        }
+
+        return count;
     }
 
     public TargetPointer GetSyncBlockFromCleanupList()
