@@ -11,6 +11,9 @@ namespace Microsoft.Diagnostics.DataContractReader.Contracts.GCInfoHelpers;
 
 internal class GcInfoDecoder<TTraits> : IGCInfoDecoder where TTraits : IGCInfoTraits
 {
+    private const uint MinimumSupportedGCInfoVersion = 4;
+    private const uint MaximumSupportedGCInfoVersion = 5;
+
     private enum DecodePoints
     {
         CodeLength,
@@ -140,6 +143,12 @@ internal class GcInfoDecoder<TTraits> : IGCInfoDecoder where TTraits : IGCInfoTr
 
     public GcInfoDecoder(Target target, TargetPointer gcInfoAddress, uint gcVersion)
     {
+        if (gcVersion < MinimumSupportedGCInfoVersion)
+            throw new NotSupportedException($"GCInfo version {gcVersion} is not supported. Minimum supported version is {MinimumSupportedGCInfoVersion}.");
+
+        if (gcVersion > MaximumSupportedGCInfoVersion)
+            throw new NotSupportedException($"GCInfo version {gcVersion} is not supported. Maximum supported version is {MaximumSupportedGCInfoVersion}.");
+
         _target = target;
         _pGcInfo = gcInfoAddress;
         _gcVersion = gcVersion;
