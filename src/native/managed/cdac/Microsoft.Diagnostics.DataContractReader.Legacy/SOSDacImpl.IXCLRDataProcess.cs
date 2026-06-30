@@ -21,7 +21,11 @@ public sealed unsafe partial class SOSDacImpl : IXCLRDataProcess, IXCLRDataProce
 {
     int IXCLRDataProcess.Flush()
     {
-        _target.Flush(FlushScope.All);
+        // A DAC flush corresponds to ICorDebug's PROCESS_RUNNING: the target may have executed
+        // forward, so volatile state must be re-read, but immutable caches (e.g. ECMA metadata) may
+        // be retained. Using ForwardExecution instead of All avoids re-reading System.Private.CoreLib's
+        // multi-MB metadata blob on every command, which otherwise churns the cDAC's own GC heap.
+        _target.Flush(FlushScope.ForwardExecution);
 
         // Flush is always propagated — it's cache management, not data retrieval.
         if (_legacyProcess is not null)

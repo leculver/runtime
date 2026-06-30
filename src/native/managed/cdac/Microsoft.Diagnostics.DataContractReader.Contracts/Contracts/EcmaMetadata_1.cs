@@ -18,6 +18,16 @@ internal sealed class EcmaMetadata_1(Target target) : IEcmaMetadata
 
     public void Flush(FlushScope scope)
     {
+        // The cached metadata blob (and its resolved read-only address) come from a module's
+        // immutable ECMA metadata, which the runtime loads once and never mutates for the lifetime
+        // of a loaded module. FlushScope.cs documents ECMA metadata as retainable across
+        // FlushScope.ForwardExecution, so only a full flush discards it. Without this guard the
+        // legacy SOS/DAC entry points (which flush around every command) force GetMetadataProvider
+        // to re-read and re-allocate the entire System.Private.CoreLib metadata blob (~3.4 MB on the
+        // UOH) on every call, churning the cDAC's own GC. Mirrors ManagedTypeSource_1.Flush.
+        if (scope != FlushScope.All)
+            return;
+
         _metadata.Clear();
         _readOnlyMetadataAddress.Clear();
     }

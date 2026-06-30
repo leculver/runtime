@@ -6694,7 +6694,9 @@ public sealed unsafe partial class SOSDacImpl
     }
     int ISOSDacInterface13.LockedFlush()
     {
-        _target.Flush(FlushScope.All);
+        // See IXCLRDataProcess.Flush: a DAC flush is PROCESS_RUNNING semantics, so retain immutable
+        // caches (ECMA metadata) instead of re-reading CoreLib's multi-MB metadata blob every command.
+        _target.Flush(FlushScope.ForwardExecution);
 
         // As long as any part of cDAC falls back to the legacy DAC, we need to propagate the Flush call
         if (_legacyImpl13 is not null)
