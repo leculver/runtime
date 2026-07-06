@@ -20,6 +20,10 @@
     <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
 
+  <ItemGroup Condition="'$(_targetOS)' == 'linux'">
+    <ExtraLinkerArg Include="-z,nodelete" />
+  </ItemGroup>
+
   <PropertyGroup>
     <CommonPath>$([MSBuild]::NormalizeDirectory('$(LibrariesProjectRoot)', 'Common', 'src'))</CommonPath>
   </PropertyGroup>
